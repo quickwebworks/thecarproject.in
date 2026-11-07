@@ -88,3 +88,18 @@ Browser QA completed on the sample preview: quick-add vehicle preserves purchase
 - Verify duplicate master names/vehicle numbers and invalid dates/negative amounts are rejected.
 - Upload valid PDF/JPEG/PNG; reject invalid MIME and files over 10 MB; verify document directory cannot be accessed publicly and download requires login.
 - Confirm backup restoration, HTTPS cookie settings, web-root isolation and phone layouts.
+
+## Hostinger Git deployment into public_html
+
+The repository now includes root `index.php`, `api.php` and `.htaccess` for Hostinger plans that deploy the complete repository into the domain's `public_html` directory. This fixes the missing root entry point; it does not provision the database.
+
+1. In the domain's Git deployment settings, deploy branch `main` into the domain web root (normally `public_html`), rather than an extra repository-named subfolder.
+2. Redeploy the latest commit. Check that `public_html/index.php`, `public_html/.htaccess` and `public_html/public/index.php` exist. Hidden files must be included.
+3. The root rules internally route the homepage, API and assets into `public/`. Other repository paths are denied. Do not remove these rules or enable directory browsing. This layout requires Apache/LiteSpeed to honor `.htaccess` and rewrite rules.
+4. Create `config.php` from `config.example.php` **on the server only**, enter MySQL credentials there, and run `php bin/install.php` over SSH as described above. Do not commit configuration credentials. The Git ignore rules preserve local configuration and uploaded documents during normal Git updates; do not use a deployment cleanup that deletes ignored files.
+5. If the page says “Configure config.php and run the CLI installer first”, routing is working and database setup is the next step.
+6. Keep ordinary code files at 644 and directories at 755, with tighter settings for configuration and private files as supported by the host. Do not change private upload file permissions to public-readable or use 777.
+7. Verify that requests to `/database/schema.sql`, `/config.php`, `/storage/` and `/.git/config` are denied. If these are reachable, stop using the root-deployment layout and configure the document root to `public/` or move private application files outside the web root.
+8. If a 403 remains on the homepage, inspect Hostinger's error/access logs and deployment location. This source change cannot resolve account-level permission, ownership, WAF or domain configuration errors.
+
+The preferred layout remains a document root pointing directly to `public/`, with other application files outside it. The root routing files provide compatibility where that is not configurable. A direct request to `/public/app.html` is intentionally forbidden; use the domain homepage or `/public/index.php`.

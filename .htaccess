@@ -1,0 +1,20 @@
+# Hostinger / Apache / LiteSpeed: repository deployed into public_html.
+# Keep this file in place. Only the application entry points and assets are public.
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+
+# Allow certificate validation performed by the host.
+RewriteRule ^\.well-known/acme-challenge/[A-Za-z0-9_-]+$ - [L]
+
+# Root URLs are forwarded internally, preserving request methods and query strings.
+RewriteRule ^(?:index\.php)?$ public/index.php [L]
+RewriteRule ^api\.php$ public/api.php [L]
+RewriteRule ^assets/([A-Za-z0-9_-]+\.(?:css|js|png|jpe?g|svg|webp|ico))$ public/assets/$1 [L,NC]
+
+# Allow a second rewrite pass and direct /public entry points.
+RewriteRule ^public/(?:index\.php|api\.php)$ - [L]
+RewriteRule ^public/assets/[A-Za-z0-9_-]+\.(?:css|js|png|jpe?g|svg|webp|ico)$ - [L,NC]
+
+# Everything else is private: config, SQL, uploads, source, tests and Git metadata.
+RewriteRule ^ - [F,L]
