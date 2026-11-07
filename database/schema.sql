@@ -1,0 +1,69 @@
+CREATE TABLE users (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ name VARCHAR(120) NOT NULL, username VARCHAR(80) NOT NULL UNIQUE,
+ password_hash VARCHAR(255) NOT NULL, role ENUM('admin','manager','accountant','viewer') NOT NULL,
+ active BOOLEAN NOT NULL DEFAULT 1, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE login_attempts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, identifier CHAR(64) NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX(identifier,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE masters (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ kind ENUM('vehicle','bank','client','party','document','yard','portal') NOT NULL,
+ name VARCHAR(160) NOT NULL, contact VARCHAR(60) NOT NULL DEFAULT '',
+ address VARCHAR(500) NOT NULL DEFAULT '', city VARCHAR(100) NOT NULL DEFAULT '',
+ details VARCHAR(500) NOT NULL DEFAULT '', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY master_name(kind,name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE purchases (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ vehicle_id BIGINT UNSIGNED NOT NULL UNIQUE, bank_id BIGINT UNSIGNED NULL,
+ client_id BIGINT UNSIGNED NULL, yard_id BIGINT UNSIGNED NULL, portal_id BIGINT UNSIGNED NULL,
+ purchase_date DATE NOT NULL, amount DECIMAL(14,2) NOT NULL,
+ yard_expense DECIMAL(14,2) NOT NULL DEFAULT 0,
+ manager_name VARCHAR(120) NOT NULL DEFAULT '', manager_contact VARCHAR(60) NOT NULL DEFAULT '',
+ created_by BIGINT UNSIGNED NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(vehicle_id) REFERENCES masters(id), FOREIGN KEY(bank_id) REFERENCES masters(id),
+ FOREIGN KEY(client_id) REFERENCES masters(id), FOREIGN KEY(yard_id) REFERENCES masters(id),
+ FOREIGN KEY(portal_id) REFERENCES masters(id), FOREIGN KEY(created_by) REFERENCES users(id),
+ CHECK(amount>=0), CHECK(yard_expense>=0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE expenses (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, vehicle_id BIGINT UNSIGNED NOT NULL,
+ party_id BIGINT UNSIGNED NOT NULL, bill_no VARCHAR(100) NOT NULL UNIQUE, expense_date DATE NOT NULL,
+ created_by BIGINT UNSIGNED NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(vehicle_id) REFERENCES masters(id), FOREIGN KEY(party_id) REFERENCES masters(id),
+ FOREIGN KEY(created_by) REFERENCES users(id), INDEX(vehicle_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE expense_items (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, expense_id BIGINT UNSIGNED NOT NULL,
+ name VARCHAR(200) NOT NULL, qty DECIMAL(10,2) NOT NULL, total DECIMAL(14,2) NOT NULL,
+ FOREIGN KEY(expense_id) REFERENCES expenses(id), CHECK(qty>0), CHECK(total>=0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE sales (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, vehicle_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ client_id BIGINT UNSIGNED NOT NULL, sale_date DATE NOT NULL, amount DECIMAL(14,2) NOT NULL,
+ sale_expense DECIMAL(14,2) NOT NULL DEFAULT 0,
+ salesperson VARCHAR(120) NOT NULL DEFAULT '', created_by BIGINT UNSIGNED NOT NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(vehicle_id) REFERENCES masters(id), FOREIGN KEY(client_id) REFERENCES masters(id),
+ FOREIGN KEY(created_by) REFERENCES users(id), CHECK(amount>=0), CHECK(sale_expense>=0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE documents (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, vehicle_id BIGINT UNSIGNED NOT NULL,
+ document_id BIGINT UNSIGNED NOT NULL, original_name VARCHAR(255) NOT NULL,
+ stored_name VARCHAR(100) NOT NULL UNIQUE, mime VARCHAR(100) NOT NULL, expiry_date DATE NULL,
+ created_by BIGINT UNSIGNED NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(vehicle_id) REFERENCES masters(id), FOREIGN KEY(document_id) REFERENCES masters(id),
+ FOREIGN KEY(created_by) REFERENCES users(id), INDEX(vehicle_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE audit_log (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id BIGINT UNSIGNED NOT NULL,
+ action VARCHAR(80) NOT NULL, entity_id BIGINT UNSIGNED NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO masters(kind,name) VALUES
+ ('document','RC'),('document','Insurance'),('document','NOC'),('document','RTO Kit'),
+ ('document','Release Letter From Bank'),('document','Permit'),('document','Other'),('portal','Cars24');
