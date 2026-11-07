@@ -103,3 +103,17 @@ The repository now includes root `index.php`, `api.php` and `.htaccess` for Host
 8. If a 403 remains on the homepage, inspect Hostinger's error/access logs and deployment location. This source change cannot resolve account-level permission, ownership, WAF or domain configuration errors.
 
 The preferred layout remains a document root pointing directly to `public/`, with other application files outside it. The root routing files provide compatibility where that is not configurable. A direct request to `/public/app.html` is intentionally forbidden; use the domain homepage or `/public/index.php`.
+
+## Installer on hosts with PHP shell_exec disabled
+
+Redeploy the latest main branch first. From the repository directory in an SSH Bash terminal, use:
+
+```bash
+bash -c '
+IFS= read -r -s -p "Admin password (12-128 characters): " tcp_password || exit 1
+printf "\n"
+printf "%s\n" "$tcp_password" | php bin/install.php --name="Your Full Name" --username="superadmin" --password-stdin
+'
+```
+
+Replace the full name and username as needed; keep the password out of command arguments, files, Git and screenshots. The SSH shell hides password entry and pipes it directly to the installer. PHP does not invoke shell_exec in this mode. Usernames allow 3-80 letters, digits, underscores, dots and hyphens. Password input must contain 12-128 characters. The installer still refuses to overwrite an existing users table. Input validation and PHP syntax were checked with shell_exec disabled; target-host MySQL installation must still be confirmed.
