@@ -21,24 +21,32 @@ function companyDatabasePassword():string {
  // Hostinger requires uppercase, lowercase and a digit; include a symbol as well.
  return 'Aa7!'.bin2hex(random_bytes(16));
 }
-function hostingerValidationSummary(string $response):string {
- $body=json_decode($response,true);if(!is_array($body))return '';
- $errors=$body['errors']??($body['error']['errors']??null);
- if(!is_array($errors))return '';
- $labels=['name'=>'Database name','user'=>'Database username','password'=>'Database password','website_domain'=>'Website domain','username'=>'Hosting account'];
- $details=[];
- foreach($labels as $field=>$label){
-  if(!array_key_exists($field,$errors))continue;
-  $messages=is_array($errors[$field])?$errors[$field]:[$errors[$field]];$reasons=[];
-  foreach($messages as $message){
-   if(!is_string($message))continue;
-   // Translate only recognized rules; never return raw provider text or submitted values.
-   $text=strtolower($message);
-   foreach(['uppercase'=>'uppercase letter required','lowercase'=>'lowercase letter required','required'=>'required field','already'=>'already exists','taken'=>'already in use','maximum'=>'maximum length exceeded','too long'=>'value too long','minimum'=>'minimum length not met','at least'=>'minimum requirement not met','invalid'=>'invalid value','not valid'=>'invalid value'] as $pattern=>$reason)if(str_contains($text,$pattern))$reasons[]=$reason;
+function hostingerValidationSummary(string $response,array $secrets=[]):string {
+ $body=json_decode($response,true);if(!is_array($body))return ' Hostinger returned no readable JSON error details.';
+ $redact=function(string $text)use($secrets):string{
+  foreach($secrets as $secret){
+   if(!is_string($secret)||$secret==='')continue;
+   $variants=[$secret,rawurlencode($secret),urlencode($secret),htmlspecialchars($secret,ENT_QUOTES,'UTF-8')];
+   $text=str_replace($variants,'[REDACTED]',$text);
   }
-  $details[]=$label.($reasons?': '.implode(', ',array_unique($reasons)):' rejected by Hostinger validation');
- }
- return $details?' '.implode('; ',$details).'.':'';
+  $text=preg_replace('/Bearer\\s+[^\\s,;]+/i','Bearer [REDACTED]',$text);
+  $text=preg_replace('/\\b(password|api[_ -]?token|authorization)\\s*[=:]\\s*[^\\s,;]+/i','$1=[REDACTED]',$text);
+  $text=trim(preg_replace('/[\\x00-\\x1F\\x7F]+/',' ',strip_tags($text)));
+  return mb_substr($text,0,240,'UTF-8');
+ };
+ $details=[];$collect=function(mixed $value,int $depth=0)use(&$collect,&$details,$redact):void{
+  if(count($details)>=4||$depth>4)return;
+  if(is_string($value)){$text=$redact($value);if($text!=='')$details[]=$text;}
+  elseif(is_array($value))foreach($value as $item)$collect($item,$depth+1);
+ };
+ // Only error messages, never echoed request/input/header objects.
+ foreach(['message','detail'] as $key)if(isset($body[$key])&&is_string($body[$key]))$collect($body[$key]);
+ if(isset($body['error'])&&is_string($body['error']))$collect($body['error']);
+ elseif(isset($body['error'])&&is_array($body['error']))foreach(['message','detail','errors'] as $key)if(isset($body['error'][$key]))$collect($body['error'][$key]);
+ if(isset($body['errors'])&&is_array($body['errors']))$collect($body['errors']);
+ $message=$details?' Hostinger: '.implode(' ',array_unique($details)):' Hostinger returned no specific validation message.';
+ $id=$body['correlation_id']??null;if(is_string($id)&&preg_match('/^[a-f0-9-]{16,64}$/i',$id))$message.=' Support reference: '.$id.'.';
+ return $message;
 }
 function hostingerCreateCompanyDatabase(array $config,array $settings):void {
  if(!function_exists('curl_init'))fail('Enable the PHP cURL extension for automatic company setup.',503);
@@ -48,7 +56,7 @@ function hostingerCreateCompanyDatabase(array $config,array $settings):void {
  if($response===false||$status<200||$status>=300){
   // Never include provider responses or credentials in browser errors or logs.
   error_log('CarProject automatic database provisioning HTTP status: '.$status);
-  $detail=$status===422?hostingerValidationSummary(is_string($response)?$response:''):'';
+  $detail=$status===422?hostingerValidationSummary(is_string($response)?$response:'',[$config['api_token'],$settings['password']]):'';
   throw new RuntimeException('Hostinger did not confirm database creation (HTTP '.$status.').'.$detail.' Check hosting configuration and database quota. The private setup record was retained.', $status);
  }
 }
