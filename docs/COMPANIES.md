@@ -41,3 +41,7 @@ A timeout or uncertain response blocks automatic retry: verify the generated dat
 A database connection failure after creation leaves the `provisioned` record for retry. A partially created schema or failed admin initialization requires administrator inspection; the application does not overwrite tables or delete databases. A completed setup whose registry write failed can retry using its `initialized` record. Back up the private company registry and credentials along with each company database.
 
 Provider reference: https://github.com/hostinger/api-php-sdk/blob/main/docs/Api/HostingDatabasesApi.md
+
+## HTTP 422 password correction
+
+Deploy the latest code and retry the same company name. Generated database passwords now always include uppercase, lowercase, digits and a symbol. For a previously rejected request, the private setup record retains its database name and generates a compliant replacement password before retrying. Existing initialized databases and their passwords are never changed. HTTP 422 errors now show recognized validation fields and rules without exposing submitted values. An uncertain timeout remains blocked for administrator verification; do not delete setup records or existing databases merely to retry a validation error.

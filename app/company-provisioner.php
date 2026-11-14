@@ -17,6 +17,29 @@ function companyProvisioningConfig():array {
  if(!is_string($config['host'])||!preg_match('/^[a-zA-Z0-9.-]+$/',$config['host'])||!is_string($config['domain'])||!preg_match('/^[a-zA-Z0-9.-]+$/',$config['domain']))fail('Check the private hosting account configuration.',503);
  return $config;
 }
+function companyDatabasePassword():string {
+ // Hostinger requires uppercase, lowercase and a digit; include a symbol as well.
+ return 'Aa7!'.bin2hex(random_bytes(16));
+}
+function hostingerValidationSummary(string $response):string {
+ $body=json_decode($response,true);if(!is_array($body))return '';
+ $errors=$body['errors']??($body['error']['errors']??null);
+ if(!is_array($errors))return '';
+ $labels=['name'=>'Database name','user'=>'Database username','password'=>'Database password','website_domain'=>'Website domain','username'=>'Hosting account'];
+ $details=[];
+ foreach($labels as $field=>$label){
+  if(!array_key_exists($field,$errors))continue;
+  $messages=is_array($errors[$field])?$errors[$field]:[$errors[$field]];$reasons=[];
+  foreach($messages as $message){
+   if(!is_string($message))continue;
+   // Translate only recognized rules; never return raw provider text or submitted values.
+   $text=strtolower($message);
+   foreach(['uppercase'=>'uppercase letter required','lowercase'=>'lowercase letter required','required'=>'required field','already'=>'already exists','taken'=>'already in use','maximum'=>'maximum length exceeded','too long'=>'value too long','minimum'=>'minimum length not met','at least'=>'minimum requirement not met','invalid'=>'invalid value','not valid'=>'invalid value'] as $pattern=>$reason)if(str_contains($text,$pattern))$reasons[]=$reason;
+  }
+  $details[]=$label.($reasons?': '.implode(', ',array_unique($reasons)):' rejected by Hostinger validation');
+ }
+ return $details?' '.implode('; ',$details).'.':'';
+}
 function hostingerCreateCompanyDatabase(array $config,array $settings):void {
  if(!function_exists('curl_init'))fail('Enable the PHP cURL extension for automatic company setup.',503);
  $curl=curl_init('https://developers.hostinger.com/api/hosting/v1/accounts/'.rawurlencode($config['account']).'/databases');
@@ -25,7 +48,8 @@ function hostingerCreateCompanyDatabase(array $config,array $settings):void {
  if($response===false||$status<200||$status>=300){
   // Never include provider responses or credentials in browser errors or logs.
   error_log('CarProject automatic database provisioning HTTP status: '.$status);
-  throw new RuntimeException('Hostinger did not confirm database creation (HTTP '.$status.'). Check the API token, hosting permissions and database quota. The private setup record was retained.', $status);
+  $detail=$status===422?hostingerValidationSummary(is_string($response)?$response:''):'';
+  throw new RuntimeException('Hostinger did not confirm database creation (HTTP '.$status.').'.$detail.' Check hosting configuration and database quota. The private setup record was retained.', $status);
  }
 }
 function prepareAutomaticCompanyDatabase(string $key,array $metadata):array {
@@ -38,10 +62,11 @@ function prepareAutomaticCompanyDatabase(string $key,array $metadata):array {
   if($job['stage']==='requesting')fail('An earlier database creation was not confirmed. The administrator must verify the private company setup record in Hostinger before retrying. Existing databases were not changed.',409);
  }else{
   $database=$config['account'].'_tcp'.bin2hex(random_bytes(6));
-  $settings=['database'=>$database,'dsn'=>'mysql:host='.$config['host'].';port=3306;dbname='.$database.';charset=utf8mb4','username'=>$database,'password'=>bin2hex(random_bytes(24))];
+  $settings=['database'=>$database,'dsn'=>'mysql:host='.$config['host'].';port=3306;dbname='.$database.';charset=utf8mb4','username'=>$database,'password'=>companyDatabasePassword()];
   $job=['stage'=>'new','settings'=>$settings];
  }
  if(in_array($job['stage'],['new','rejected'],true)){
+  if($job['stage']==='rejected')$job['settings']['password']=companyDatabasePassword();
   $job['stage']='requesting';
   // Save generated credentials before the external request, including uncertain failures.
   writePrivateCompanyJson($path,$job);
