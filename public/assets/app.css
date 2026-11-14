@@ -63,3 +63,7 @@ svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.
 .statvalue{font-size:clamp(18px,1.6vw,27px);letter-spacing:-.5px;overflow-wrap:anywhere}
 .charttop>div:first-child{min-width:0}.charttop strong{overflow-wrap:anywhere}
 @media(max-width:600px){.statvalue{font-size:20px}}
+
+
+/* SVG geometry works with the existing strict style-src policy. */
+.chartplot{overflow-x:auto}.transaction-chart{display:block;width:100%;min-width:540px;height:auto}.inventory-meter{display:block;width:100%;height:10px;margin:12px 0;border-radius:5px;overflow:hidden}.chartwrap .chartfoot{margin-top:12px}
