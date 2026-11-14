@@ -21,6 +21,26 @@ function companyDatabasePassword():string {
  // Hostinger requires uppercase, lowercase and a digit; include a symbol as well.
  return 'Aa7!'.bin2hex(random_bytes(16));
 }
+function newCompanyDatabaseSettings(array $config):array {
+ // Keep the complete name short, including Hostinger's account prefix.
+ $suffixLength=min(5,16-strlen($config['account'])-1);
+ if($suffixLength<4)fail('The hosting account prefix is too long for automatic short database names.',503);
+ $alphabet='0123456789abcdefghijklmnopqrstuvwxyz';$suffix='c';
+ for($i=1;$i<$suffixLength;$i++)$suffix.=$alphabet[random_int(0,strlen($alphabet)-1)];
+ $database=$config['account'].'_'.$suffix;
+ return ['database'=>$database,'dsn'=>'mysql:host='.$config['host'].';port=3306;dbname='.$database.';charset=utf8mb4','username'=>$database,'password'=>companyDatabasePassword()];
+}
+function companySetupForRetry(array $job,array $config):array {
+ // Only explicitly rejected requests can receive a new name. Never rename
+ // provisioned/initialized databases or uncertain, in-flight requests.
+ if($job['stage']==='rejected')$job['settings']=newCompanyDatabaseSettings($config);
+ return $job;
+}
+function hostingerCompanyDatabasePayload(array $config,array $settings):array {
+ $prefix=$config['account'].'_';
+ if(!str_starts_with($settings['database'],$prefix)||!str_starts_with($settings['username'],$prefix))fail('The database setup record does not match the hosting account.',503);
+ return ['name'=>substr($settings['database'],strlen($prefix)),'user'=>substr($settings['username'],strlen($prefix)),'password'=>$settings['password'],'website_domain'=>$config['domain']];
+}
 function hostingerValidationSummary(string $response,array $secrets=[]):string {
  $body=json_decode($response,true);if(!is_array($body))return ' Hostinger returned no readable JSON error details.';
  $redact=function(string $text)use($secrets):string{
@@ -51,7 +71,7 @@ function hostingerValidationSummary(string $response,array $secrets=[]):string {
 function hostingerCreateCompanyDatabase(array $config,array $settings):void {
  if(!function_exists('curl_init'))fail('Enable the PHP cURL extension for automatic company setup.',503);
  $curl=curl_init('https://developers.hostinger.com/api/hosting/v1/accounts/'.rawurlencode($config['account']).'/databases');
- curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_TIMEOUT=>45,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$config['api_token'],'Content-Type: application/json','Accept: application/json'],CURLOPT_POSTFIELDS=>json_encode(['name'=>$settings['database'],'user'=>$settings['username'],'password'=>$settings['password'],'website_domain'=>$config['domain']],JSON_THROW_ON_ERROR)]);
+ curl_setopt_array($curl,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_TIMEOUT=>45,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$config['api_token'],'Content-Type: application/json','Accept: application/json'],CURLOPT_POSTFIELDS=>json_encode(hostingerCompanyDatabasePayload($config,$settings),JSON_THROW_ON_ERROR)]);
  $response=curl_exec($curl);$status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);curl_close($curl);
  if($response===false||$status<200||$status>=300){
   // Never include provider responses or credentials in browser errors or logs.
@@ -69,12 +89,11 @@ function prepareAutomaticCompanyDatabase(string $key,array $metadata):array {
   if(!is_array($job)||!isset($job['settings'],$job['stage'])||!in_array($job['stage'],['new','rejected','requesting','provisioned','schema_ready','initialized'],true))fail('Company setup record needs administrator attention.',503);
   if($job['stage']==='requesting')fail('An earlier database creation was not confirmed. The administrator must verify the private company setup record in Hostinger before retrying. Existing databases were not changed.',409);
  }else{
-  $database=$config['account'].'_tcp'.bin2hex(random_bytes(6));
-  $settings=['database'=>$database,'dsn'=>'mysql:host='.$config['host'].';port=3306;dbname='.$database.';charset=utf8mb4','username'=>$database,'password'=>companyDatabasePassword()];
+  $settings=newCompanyDatabaseSettings($config);
   $job=['stage'=>'new','settings'=>$settings];
  }
  if(in_array($job['stage'],['new','rejected'],true)){
-  if($job['stage']==='rejected')$job['settings']['password']=companyDatabasePassword();
+  $job=companySetupForRetry($job,$config);
   $job['stage']='requesting';
   // Save generated credentials before the external request, including uncertain failures.
   writePrivateCompanyJson($path,$job);

@@ -18,3 +18,17 @@ $encoded=hostingerValidationSummary(json_encode(['message'=>'<b>'.rawurlencode($
 verify(!str_contains($encoded,'secret-value')&&!str_contains($encoded,rawurlencode($password))&&!str_contains($encoded,'<b>'),'Encoded values and authorization redacted');
 verify(str_contains(hostingerValidationSummary('not JSON'),'no readable JSON'),'Non JSON handled');
 echo "PASS: compliant passwords; top-level/nested error details; support references; raw and encoded secret redaction; echoed input excluded.\n";
+
+$config=['account'=>'u277153942','host'=>'localhost','domain'=>'thecarproject.in'];
+for($i=0;$i<100;$i++){
+ $settings=newCompanyDatabaseSettings($config);$payload=hostingerCompanyDatabasePayload($config,$settings);
+ verify(strlen($settings['database'])<=16&&strlen($settings['username'])<=16,'Full names include prefix within short-name budget');
+ verify(preg_match('/^c[a-z0-9]{4}$/',$payload['name'])===1,'API sends short alphanumeric suffix');
+ verify($settings['database']===$config['account'].'_'.$payload['name'],'Stored full name matches API prefix behavior');
+ verify(str_contains($settings['dsn'],'dbname='.$settings['database'].';'),'Connection uses full name');
+}
+$old=['database'=>'u277153942_tcp0123456789ab','username'=>'u277153942_tcp0123456789ab','password'=>'old-password','dsn'=>'mysql:host=localhost;dbname=u277153942_tcp0123456789ab'];
+$job=companySetupForRetry(['stage'=>'rejected','settings'=>$old],$config);
+verify(strlen($job['settings']['database'])<=16&&$job['settings']['database']!==$old['database'],'Rejected overlong setup record receives new short names');
+foreach(['provisioned','schema_ready','initialized','requesting'] as $stage)verify(companySetupForRetry(['stage'=>$stage,'settings'=>$old],$config)['settings']===$old,'Existing or uncertain setup credentials must remain unchanged');
+echo "PASS: short API names, matching prefixed connections, rejected-record recovery, and provisioned/in-flight record preservation.\n";

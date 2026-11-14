@@ -34,7 +34,7 @@ Once configured, adding companies requires no technical database fields. Existin
 
 ## Failure recovery
 
-Missing hosting configuration shows an actionable setup message before any database request. A rejected API request (HTTP 400/401/403/404/422/429) may be retried after correcting the hosting connection or quota. The generated credentials are retained privately in `storage/company-setup-<key>.json`, so retrying does not generate another database name.
+Missing hosting configuration shows an actionable setup message before any database request. A rejected API request (HTTP 400/401/403/404/422/429) may be retried after correcting the hosting connection or quota. The generated credentials are retained privately in `storage/company-setup-<key>.json`, so a confirmed rejection can safely receive a fresh short database name and password on retry.
 
 A timeout or uncertain response blocks automatic retry: verify the generated database in hPanel before proceeding. The setup record contains credentials; do not share or commit it. If creation actually succeeded, the administrator can change its stage from `requesting` to `provisioned`, then retry the same company name. If hPanel confirms no database was created, remove only that pending setup record and retry. Never delete an existing company database to resolve a setup error.
 
@@ -44,4 +44,8 @@ Provider reference: https://github.com/hostinger/api-php-sdk/blob/main/docs/Api/
 
 ## HTTP 422 password correction
 
-Deploy the latest code and retry the same company name. Generated database passwords now always include uppercase, lowercase, digits and a symbol. For a previously rejected request, the private setup record retains its database name and generates a compliant replacement password before retrying. Existing initialized databases and their passwords are never changed. HTTP 422 errors now show recognized validation fields and rules without exposing submitted values. An uncertain timeout remains blocked for administrator verification; do not delete setup records or existing databases merely to retry a validation error.
+Deploy the latest code and retry the same company name. Generated database passwords now always include uppercase, lowercase, digits and a symbol. For a previously rejected request, the private setup record receives short database/user names and a compliant replacement password before retrying. Existing initialized databases and their passwords are never changed. HTTP 422 errors now show recognized validation fields and rules without exposing submitted values. An uncertain timeout remains blocked for administrator verification; do not delete setup records or existing databases merely to retry a validation error.
+
+## Database name too long (Hosting:9999)
+
+New company databases now use a short alphanumeric suffix; the API adds the hosting-account prefix, and PHP stores that same full name for its connection. The complete generated name is kept within a conservative 16-character budget, including the account prefix. On retry, explicitly rejected setup records are regenerated automatically with short names. Do not delete the setup file: retry the same company name after deploying the update. Records already marked provisioned, schema_ready, initialized or requesting are never renamed by this correction.
