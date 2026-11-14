@@ -8,7 +8,7 @@ A dealership administration application for purchases, vehicle expenses, sales, 
 - Vehicle inventory and a linked financial ledger per vehicle.
 - Purchase entry: vehicle, bank, seller, date, amount, manager/contact, yard and portal; initial yard expense.
 - Sale entry: in-stock vehicle, buyer, salesperson, date, amount, sale expense, net sales and profit preview.
-- Expense bills with globally unique bill number, party, date and multiple quantity/line-total items.
+- Expense entry with vehicle and party at the top, then repeatable rows: Bill No. / Date of Bill / Item Name / Bill Amount. Each row creates a separate bill with a globally unique number; quantities are not entered.
 - Searchable master selectors and nested **Save & select** dialogs. The existing transaction remains in place without a page refresh.
 - Vehicle, bank, client/seller, party, document, yard and portal masters.
 - Private PDF/JPEG/PNG document storage, authenticated downloads, expiry dates and checklist.
@@ -55,7 +55,7 @@ Every authenticated role can see vehicle financial figures and client/party reco
 - Vehicle cost = purchase amount + yard expense + sum of expense bill line totals.
 - Net sales = sale amount − sale expenses.
 - Net vehicle profit = net sales − vehicle cost.
-- An expense item's `total` is the **full amount for the whole quantity**. Four tyres with a line total of ₹20,000 add ₹20,000, not ₹80,000.
+- Each new expense row's Bill Amount is its full cost and is counted once. New rows have an internal quantity of 1. Historical multi-item bills keep their existing quantities and full line totals; these are not multiplied again.
 - Enter any cost in only one category. Do not repeat initial yard charges as a separate expense bill.
 - Unsold vehicles hold inventory cost and have no realized profit. Later bills for a sold vehicle update its displayed lifetime profit.
 - Shared overhead, GST/taxes, interest and other charges affect profit only when explicitly included in recorded costs. This is vehicle margin reporting, not a statutory accounting/tax system or cash/bank reconciliation.
@@ -117,3 +117,9 @@ printf "%s\n" "$tcp_password" | php bin/install.php --name="Your Full Name" --us
 ```
 
 Replace the full name and username as needed; keep the password out of command arguments, files, Git and screenshots. The SSH shell hides password entry and pipes it directly to the installer. PHP does not invoke shell_exec in this mode. Usernames allow 3-80 letters, digits, underscores, dots and hyphens. Password input must contain 12-128 characters. The installer still refuses to overwrite an existing users table. Input validation and PHP syntax were checked with shell_exec disabled; target-host MySQL installation must still be confirmed.
+
+## Expense bill row update
+
+Expense entry now keeps vehicle and party selection above repeatable bill rows. Each row requires its own unique bill number, bill date, item name and amount. Duplicate bill numbers within a submission or already recorded for any vehicle are rejected. All rows save in a single database transaction; a failed row rolls back the entire submission. Dates cannot precede the vehicle purchase date. Existing bills and the old multi-item API format remain supported. This update uses the existing expenses and expense_items tables, so no database migration or reinstall is required.
+
+Redeploy main in Hostinger and hard-refresh the browser. Run `node tests/expense-bills.test.cjs` and `php tests/expense-bills.php` for row validation and calculation tests; the PHP test needs config.php and performs no database writes. Browser testing used the sample preview; live Hostinger/MySQL acceptance remains to be checked after deployment.

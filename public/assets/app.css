@@ -23,3 +23,20 @@ svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.
  .headerlogout{padding:8px;font-size:10px;gap:5px}
  .topright>.avatar{display:none}
 }
+
+/* Each expense row is an independent bill, with no quantity field. */
+.expense-bill-header,.expense-bill-row{display:grid;grid-template-columns:1fr 1.1fr 1.6fr 1fr 32px;gap:10px;align-items:center}
+.expense-bill-header{font-size:9px;color:var(--muted);margin-bottom:10px}
+.expense-bill-row{margin-bottom:12px}
+.bill-cell{display:block;min-width:0}
+.bill-cell>span{display:none}
+.bill-cell input{width:100%;min-width:0;padding:11px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:#fff;color:var(--ink)}
+.bill-cell input:focus{outline:2px solid var(--accent);border-color:transparent}
+.bill-cell input[data-bill-no],.bill-cell input[data-name]{text-transform:uppercase}
+.remove-bill-row{min-height:40px;border:0;border-radius:7px;background:#fdf0ee;color:#b66d62;font-size:20px}
+@media(max-width:680px){
+ .expense-bill-header{display:none}
+ .expense-bill-row{grid-template-columns:1fr 1fr;gap:12px;padding:14px;border:1px solid var(--line);border-radius:10px;position:relative;background:#fafbfb}
+ .bill-cell>span{display:block;margin-bottom:5px;font-size:10px;font-weight:600;color:#647780}
+ .expense-bill-row .remove-bill-row{grid-column:1/-1;min-height:32px;font-size:18px}
+}

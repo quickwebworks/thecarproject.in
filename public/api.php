@@ -38,9 +38,23 @@ try {
     query('INSERT INTO sales(vehicle_id,client_id,sale_date,amount,sale_expense,salesperson,created_by) VALUES(?,?,?,?,?,?,?)',[$v,$c,$date,money($d,'amount'),money($d,'sale_expense'),txt($d,'salesperson',120,false),$u['id']]);audit('Recorded sale',(int)db()->lastInsertId());});out(['ok'=>true]);
   }
   if($action==='expense'){
-   allow(['admin','manager','accountant']);$v=master($d,'vehicle_id','vehicle');$p=master($d,'party_id','party');$items=$d['items']??[];if(!is_array($items)||count($items)<1||count($items)>100)fail('Add between 1 and 100 bill items.');
-   transaction(function()use($v,$p,$items,$d,$u){$purchase=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();if(!$purchase)fail('Select a purchased vehicle.');$date=dateval($d,'expense_date');if($date<$purchase['purchase_date'])fail('Expense date cannot precede purchase date.');
-    query('INSERT INTO expenses(vehicle_id,party_id,bill_no,expense_date,created_by) VALUES(?,?,?,?,?)',[$v,$p,txt($d,'bill_no',100),$date,$u['id']]);$id=(int)db()->lastInsertId();foreach($items as $item){$qty=money($item,'qty');if((float)$qty<=0||(float)$qty>99999999)fail('Quantity must be positive and within range.');query('INSERT INTO expense_items(expense_id,name,qty,total) VALUES(?,?,?,?)',[$id,txt($item,'name',200),$qty,money($item,'total')]);}audit('Recorded expense',$id);});out(['ok'=>true]);
+   allow(['admin','manager','accountant']);$v=master($d,'vehicle_id','vehicle');$p=master($d,'party_id','party');
+   require_once dirname(__DIR__).'/app/expense-bills.php';
+   transaction(function()use($v,$p,$d,$u){
+    $purchase=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();
+    if(!$purchase)fail('Select a purchased vehicle.');
+    $records=prepareExpenseBills($d,$purchase['purchase_date']);
+    // Validate the entire batch before inserting any rows.
+    foreach($records as $record){
+     if(query('SELECT id FROM expenses WHERE bill_no=?',[$record['bill_no']])->fetch())fail('Bill number '.$record['bill_no'].' already exists.');
+    }
+    foreach($records as $record){
+     query('INSERT INTO expenses(vehicle_id,party_id,bill_no,expense_date,created_by) VALUES(?,?,?,?,?)',[$v,$p,$record['bill_no'],$record['expense_date'],$u['id']]);
+     $id=(int)db()->lastInsertId();
+     foreach($record['items'] as $item)query('INSERT INTO expense_items(expense_id,name,qty,total) VALUES(?,?,?,?)',[$id,$item['name'],$item['qty'],$item['total']]);
+     audit('Recorded expense',$id);
+    }
+   });out(['ok'=>true]);
   }
   if($action==='user'){
    allow(['admin']);$role=txt($d,'role',20);if(!in_array($role,['admin','manager','accountant','viewer'],true))fail('Invalid user type.');$pw=(string)($d['password']??'');if(strlen($pw)<12||strlen($pw)>128)fail('Use a password between 12 and 128 characters.');$username=txt($d,'username',80);if(!preg_match('/^[a-zA-Z0-9_.-]{3,80}$/',$username))fail('Invalid username.');
