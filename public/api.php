@@ -28,7 +28,18 @@ try {
   if($action==='master'){
    allow(['admin','manager','accountant']);$kind=txt($d,'kind',20);if(!in_array($kind,['vehicle','bank','client','party','document','yard','portal'],true))fail('Invalid master type.');
    $name=txt($d,'name');if($kind==='vehicle'){$name=strtoupper(preg_replace('/\s+/','',$name));if(!preg_match('/^[A-Z0-9-]{4,20}$/',$name))fail('Enter a valid vehicle number.');}
-   $newId=0;transaction(function()use($d,$kind,$name,&$newId){query('INSERT INTO masters(kind,name,contact,address,city,details) VALUES(?,?,?,?,?,?)',[$kind,$name,txt($d,'contact',60,false),txt($d,'address',500,false),txt($d,'city',100,false),txt($d,'details',500,false)]);$newId=(int)db()->lastInsertId();audit('Created '.$kind,$newId);});
+   $newId=0;transaction(function()use($d,$kind,$name,&$newId){
+    $id=$d['id']??null;
+    $values=[$name,txt($d,'contact',60,false),txt($d,'address',500,false),txt($d,'city',100,false),txt($d,'details',500,false)];
+    if($id!==null){
+     $id=filter_var($id,FILTER_VALIDATE_INT);if(!$id||$id<1)fail('Invalid master record.');
+     $existing=query('SELECT id,kind FROM masters WHERE id=? FOR UPDATE',[$id])->fetch();
+     if(!$existing||$existing['kind']!==$kind)fail('Master record not found.',404);
+     query('UPDATE masters SET name=?,contact=?,address=?,city=?,details=? WHERE id=?',[...$values,$id]);$newId=$id;audit('Updated '.$kind,$id);
+    }else{
+     query('INSERT INTO masters(kind,name,contact,address,city,details) VALUES(?,?,?,?,?,?)',[$kind,...$values]);$newId=(int)db()->lastInsertId();audit('Created '.$kind,$newId);
+    }
+   });
    out(['id'=>$newId,'ok'=>true]);
   }
   if($action==='purchase'){
