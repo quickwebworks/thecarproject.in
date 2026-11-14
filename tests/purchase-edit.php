@@ -3,6 +3,7 @@ declare(strict_types=1);
 require dirname(__DIR__).'/app/purchase-editor.php';
 $db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
 $db->exec("CREATE TABLE masters(id INTEGER PRIMARY KEY,kind TEXT);INSERT INTO masters VALUES(1,'vehicle'),(2,'bank'),(3,'client'),(4,'yard'),(5,'portal'),(6,'vehicle');CREATE TABLE purchases(id INTEGER PRIMARY KEY,vehicle_id INTEGER,bank_id INTEGER,client_id INTEGER,yard_id INTEGER,portal_id INTEGER,purchase_date TEXT,amount TEXT,yard_expense TEXT,manager_name TEXT,manager_contact TEXT,created_by INTEGER);INSERT INTO purchases VALUES(10,1,2,3,4,5,'2026-04-05','400000','2000','OLD','',7);CREATE TABLE sales(vehicle_id INTEGER,sale_date TEXT,amount INTEGER);INSERT INTO sales VALUES(1,'2026-05-20',500000);CREATE TABLE expenses(vehicle_id INTEGER,expense_date TEXT);INSERT INTO expenses VALUES(1,'2026-04-20');CREATE TABLE audit_log(action TEXT,entity_id INTEGER);");
+$db->exec('CREATE TABLE yard_expenses(id INTEGER PRIMARY KEY,vehicle_id INTEGER,release_date TEXT,cost_date TEXT,legacy_purchase_id INTEGER,deleted_at TEXT)');
 function fail(string $m,int $status=422):never{throw new RuntimeException($m,$status);}
 function query(string $sql,array $params=[]):PDOStatement{global $db;$s=$db->prepare(str_replace(' FOR UPDATE','',$sql));$s->execute($params);return $s;}
 function transaction(callable $fn):void{global $db;$db->beginTransaction();try{$fn();$db->commit();}catch(Throwable $e){$db->rollBack();throw $e;}}

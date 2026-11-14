@@ -24,6 +24,7 @@ try {
    session_regenerate_id(true);$_SESSION['uid']=$u['id'];$_SESSION['auth_company']=$_SESSION['company_key'];$_SESSION['csrf']=bin2hex(random_bytes(32));audit('Signed in',(int)$u['id']);out(workspaceSessionPayload());
   }
   $u=user();
+  if(in_array($action,['purchase','sale','yard_expense','yard_delete'],true)){require_once dirname(__DIR__).'/app/yard-expenses.php';ensureYardExpenses();}
   if($action==='logout'){$_SESSION=[];session_destroy();out(['ok'=>true]);}
   if($action==='master'){
    allow(['admin','manager','accountant']);$kind=txt($d,'kind',20);if(!in_array($kind,['vehicle','bank','client','party','document','yard','portal'],true))fail('Invalid master type.');
@@ -42,21 +43,26 @@ try {
    });
    out(['id'=>$newId,'ok'=>true]);
   }
+  if($action==='yard_expense'||$action==='yard_delete'){
+   allow(['admin','manager','accountant']);saveYardExpense($d,$u,$action==='yard_delete');out(['ok'=>true]);
+  }
   if($action==='purchase'){
    allow(['admin','manager']);
    if(array_key_exists('id',$d)){require_once dirname(__DIR__).'/app/purchase-editor.php';updatePurchaseRecord($d);out(['ok'=>true]);}
-   $v=master($d,'vehicle_id','vehicle');$b=master($d,'bank_id','bank',false);$c=master($d,'client_id','client',false);$y=master($d,'yard_id','yard',false);$p=master($d,'portal_id','portal',false);
-   transaction(function()use($d,$v,$b,$c,$y,$p,$u){
+   $v=master($d,'vehicle_id','vehicle');$b=master($d,'bank_id','bank',false);$c=master($d,'client_id','client',false);$p=master($d,'portal_id','portal',false);
+   transaction(function()use($d,$v,$b,$c,$p,$u){
     query('SELECT id FROM masters WHERE id=? FOR UPDATE',[$v]);
-    query('INSERT INTO purchases(vehicle_id,bank_id,client_id,yard_id,portal_id,purchase_date,amount,yard_expense,manager_name,manager_contact,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)',[$v,$b,$c,$y,$p,postingDate($d,'purchase_date'),money($d,'amount'),money($d,'yard_expense'),txt($d,'manager_name',120,false),txt($d,'manager_contact',60,false),$u['id']]);audit('Recorded purchase',(int)db()->lastInsertId());});out(['ok'=>true]);
+    query('INSERT INTO purchases(vehicle_id,bank_id,client_id,portal_id,purchase_date,amount,manager_name,manager_contact,created_by) VALUES(?,?,?,?,?,?,?,?,?)',[$v,$b,$c,$p,postingDate($d,'purchase_date'),money($d,'amount'),txt($d,'manager_name',120,false),txt($d,'manager_contact',60,false),$u['id']]);audit('Recorded purchase',(int)db()->lastInsertId());});out(['ok'=>true]);
   }
   if($action==='sale'){
-   allow(['admin','manager']);$v=master($d,'vehicle_id','vehicle');$c=master($d,'client_id','client');
+   allow(['admin','manager']);if(array_key_exists('id',$d)){require_once dirname(__DIR__).'/app/sale-editor.php';updateSaleRecord($d);out(['ok'=>true]);}
+   $v=master($d,'vehicle_id','vehicle');$c=master($d,'client_id','client');
    transaction(function()use($v,$c,$d,$u){$p=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();if(!$p)fail('Purchase this vehicle before selling it.');$date=postingDate($d,'sale_date');if($date<$p['purchase_date'])fail('Sale date cannot precede purchase date.');
     query('INSERT INTO sales(vehicle_id,client_id,sale_date,amount,sale_expense,salesperson,created_by) VALUES(?,?,?,?,?,?,?)',[$v,$c,$date,money($d,'amount'),money($d,'sale_expense'),txt($d,'salesperson',120,false),$u['id']]);audit('Recorded sale',(int)db()->lastInsertId());});out(['ok'=>true]);
   }
   if($action==='expense'){
-   allow(['admin','manager','accountant']);$v=master($d,'vehicle_id','vehicle');
+   allow(['admin','manager','accountant']);if(array_key_exists('id',$d)){require_once dirname(__DIR__).'/app/expense-editor.php';updateExpenseRecord($d);out(['ok'=>true]);}
+   $v=master($d,'vehicle_id','vehicle');
    require_once dirname(__DIR__).'/app/expense-bills.php';
    transaction(function()use($v,$d,$u){
     $purchase=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();
@@ -102,9 +108,11 @@ try {
   header('Content-Type: '.$f['mime']);header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($f['original_name']));header('Content-Length: '.filesize($path));readfile($path);exit;
  }
  if($action==='state'){
+  require_once dirname(__DIR__).'/app/yard-expenses.php';ensureYardExpenses();
   $range=workspaceInfo()['financial_year'];$end=$range['end'];$state=[];
   $state['masters']=query('SELECT * FROM masters ORDER BY id DESC')->fetchAll();
   $state['purchases']=query('SELECT * FROM purchases WHERE purchase_date<=? ORDER BY id DESC',[$end])->fetchAll();
+  $state['yard_expenses']=query('SELECT * FROM yard_expenses WHERE deleted_at IS NULL AND cost_date<=? ORDER BY id DESC',[$end])->fetchAll();
   $state['sales']=query('SELECT * FROM sales WHERE sale_date<=? ORDER BY id DESC',[$end])->fetchAll();
   $state['expenses']=query('SELECT * FROM expenses WHERE expense_date<=? ORDER BY id DESC',[$end])->fetchAll();
   $state['expense_items']=query('SELECT i.* FROM expense_items i JOIN expenses e ON e.id=i.expense_id WHERE e.expense_date<=? ORDER BY i.id DESC',[$end])->fetchAll();
@@ -116,5 +124,6 @@ try {
  }
  fail('Not found.',404);
 }catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}
+
 
 

@@ -29,6 +29,17 @@ CREATE TABLE purchases (
  FOREIGN KEY(portal_id) REFERENCES masters(id), FOREIGN KEY(created_by) REFERENCES users(id),
  CHECK(amount>=0), CHECK(yard_expense>=0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE yard_expenses (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ vehicle_id BIGINT UNSIGNED NOT NULL, yard_id BIGINT UNSIGNED NULL,
+ release_date DATE NULL, cost_date DATE NOT NULL, amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+ legacy_purchase_id BIGINT UNSIGNED NULL UNIQUE,
+ created_by BIGINT UNSIGNED NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ deleted_at TIMESTAMP NULL DEFAULT NULL,
+ FOREIGN KEY(vehicle_id) REFERENCES masters(id), FOREIGN KEY(yard_id) REFERENCES masters(id),
+ FOREIGN KEY(legacy_purchase_id) REFERENCES purchases(id), FOREIGN KEY(created_by) REFERENCES users(id),
+ INDEX(vehicle_id), INDEX(cost_date), CHECK(amount>=0)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE expenses (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, vehicle_id BIGINT UNSIGNED NOT NULL,
  party_id BIGINT UNSIGNED NOT NULL, bill_no VARCHAR(100) NOT NULL UNIQUE, expense_date DATE NOT NULL,
@@ -67,3 +78,4 @@ CREATE TABLE audit_log (
 INSERT INTO masters(kind,name) VALUES
  ('document','RC'),('document','Insurance'),('document','NOC'),('document','RTO Kit'),
  ('document','Release Letter From Bank'),('document','Permit'),('document','Other'),('portal','Cars24');
+

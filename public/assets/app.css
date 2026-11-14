@@ -73,3 +73,6 @@ svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.
 @media(max-width:950px){.expense-bill-header{display:none}.expense-bill-row{grid-template-columns:1fr 1fr;padding:14px;border:1px solid var(--line);border-radius:10px}.bill-cell>span{display:block;margin-bottom:5px;font-size:10px;font-weight:600}.bill-party,.expense-bill-row .remove-bill-row{grid-column:1/-1}}
 @media(max-width:420px){.expense-bill-row{grid-template-columns:1fr}.expense-bill-row .bill-cell{grid-column:1/-1}}
 .bill-party .selectrow select{border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);height:40px}.bill-party .selectrow select:focus{outline:2px solid var(--accent);border-color:transparent}
+
+
+.export-choices{padding:24px}.export-choices .btn{justify-content:center}.tabletools{flex-wrap:wrap;gap:12px}
