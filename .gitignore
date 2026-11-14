@@ -5,3 +5,7 @@
 /companies.php
 
 /storage/company-registry*
+
+
+/storage/company-provisioning.php
+/storage/company-setup-*.json

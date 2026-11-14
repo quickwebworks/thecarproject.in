@@ -67,7 +67,11 @@ function workspaceChoices():array {
  return $result;
 }
 function workspaceSessionPayload():array {
- return ['user'=>empty($_SESSION['uid'])?null:user(),'csrf'=>$_SESSION['csrf'],'workspace_token'=>$_SESSION['workspace_token'],'workspace'=>workspaceInfo(),'companies'=>workspaceChoices()];
+ $profiles=[];
+ if(!empty($_SESSION['uid'])&&($_SESSION['company_key']??'')==='existing'&&user()['role']==='admin'){
+  foreach(companySettings() as $key=>$c)$profiles[$key]=array_intersect_key($c,array_flip(['address','contact_person','mobile','email']));
+ }
+ return ['company_profiles'=>$profiles,'user'=>empty($_SESSION['uid'])?null:user(),'csrf'=>$_SESSION['csrf'],'workspace_token'=>$_SESSION['workspace_token'],'workspace'=>workspaceInfo(),'companies'=>workspaceChoices()];
 }
 function requireWorkspaceToken():void {
  $token=(string)($_SERVER['HTTP_X_WORKSPACE_TOKEN']??($_GET['workspace_token']??''));
@@ -100,3 +104,4 @@ function readCompanyRegistry():array {
  $data=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
  if(!is_array($data))throw new RuntimeException('Invalid company registry.');return $data;
 }
+
