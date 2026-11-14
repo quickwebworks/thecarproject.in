@@ -4,5 +4,5 @@ return [
  'username'=>'car_project_user', 'password'=>'REPLACE_WITH_DATABASE_PASSWORD',
  'https_only'=>true,
  'company_name'=>'THE CAR PROJECT',
- 'first_year'=>2000,
+ 'first_year'=>2026,
 ];

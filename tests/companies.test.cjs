@@ -12,9 +12,13 @@ const thirdVehicle=state.masters.find(m=>m.kind==='vehicle').name;assert.notEqua
 assert.equal(state.masters.some(m=>m.name==='ONLY COMPANY TWO'),false);
 applySession(demoRequest('select_workspace',{company_key:'second_company',financial_year:2026}));
 assert.equal(state.masters.some(m=>m.name==='ONLY COMPANY TWO'),true);
-applySession(demoRequest('select_workspace',{company_key:'existing',financial_year:2025}));state=demoRequest('state');
-assert.equal(state.purchases.length,1);assert.equal(viewLedger().filter(p=>!p.sale).length,1);
+assert.throws(()=>demoRequest('select_workspace',{company_key:'existing',financial_year:2025}),/Only financial year/);
+assert.equal(companies.every(c=>c.years.length===1&&c.years[0].year===2026),true);
 applySession(demoRequest('select_workspace',{company_key:'existing',financial_year:2026}));state=demoRequest('state');
 assert.equal(state.purchases.length,6);assert.equal(inYear('2026-04-01'),true);assert.equal(inYear('2027-03-31'),true);assert.equal(inYear('2026-03-31'),false);
+user={id:1,name:'QA',role:'admin'};
+demoRequest('company_save',{operation:'edit',key:'existing',name:'RENAMED COMPANY'});assert.equal(demoSession().workspace.company_name,'RENAMED COMPANY');
+demoRequest('company_save',{operation:'add',key:'new_company',name:'NEW COMPANY'});assert.equal(demoSession().companies.length,4);
+assert.throws(()=>demoRequest('company_save',{operation:'add',key:'new_company',name:'DUPLICATE'}),/already exists/);
 console.log('PASS: three separate demo companies, no master leakage, company switch signs out, and year switching preserves records.');
 `,{assert,console,Intl,Date,FormData,localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v)},setTimeout,clearTimeout});

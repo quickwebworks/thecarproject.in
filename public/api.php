@@ -10,6 +10,9 @@ try {
   $d=str_contains($_SERVER['CONTENT_TYPE']??'','application/json')?json_decode(file_get_contents('php://input'),true,512,JSON_THROW_ON_ERROR):$_POST;
   if(!is_array($d))fail('Invalid request.');
   if($action==='select_workspace')out(selectWorkspace($d));
+  if($action==='company_save'){
+   require_once dirname(__DIR__).'/app/company-manager.php';$actor=allowCompanyManagement();saveCompanyConfiguration($d,$actor);out(['ok'=>true]);
+  }
   if($action==='login'){
    $username=txt($d,'username',80);$pw=(string)($d['password']??'');
    $ident=hash('sha256',strtolower($username));$ipident=hash('sha256','ip:'.($_SERVER['REMOTE_ADDR']??''));
@@ -78,6 +81,9 @@ try {
  }
  $u=user();
  requireWorkspaceToken();
+ if($action==='companies'){
+  require_once dirname(__DIR__).'/app/company-manager.php';allowCompanyManagement();out(['companies'=>companyPublicDetails()]);
+ }
  if($action==='download'){
   $f=query('SELECT * FROM documents WHERE id=?',[(int)($_GET['id']??0)])->fetch();if(!$f)fail('Document not found.',404);$path=documentDirectory().'/'.$f['stored_name'];if(!is_file($path))fail('File unavailable.',404);
   header('Content-Type: '.$f['mime']);header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($f['original_name']));header('Content-Length: '.filesize($path));readfile($path);exit;

@@ -1,102 +1,74 @@
-# Companies and financial years on Hostinger
+# Add, edit and set up companies
 
-Use the same website from any browser on one Windows PC. Nothing needs to be installed on the PC. Internet is required; data stays on Hostinger.
+The software now offers ONLY financial year **2026–2027: 1 April 2026 to 31 March 2027**. Older year options are removed and other year selections are rejected by the server. Previously entered records are not deleted; prior-year vehicle costs still carry forward where relevant.
 
-## What changes
+## Open Companies
 
-- Company and financial-year selectors appear on the sign-in page and in the signed-in workspace.
-- Each company uses a separate MySQL database, with its own user accounts, masters, vehicles, bills, files and audit log.
-- Changing company signs you out. Log in with an account installed in that company.
-- Changing the financial year within the same company keeps the session, but issues a fresh workspace token.
-- Old tabs cannot save or download against a newly selected company/year without reloading.
-- Financial years run 1 April through 31 March. Years through the next financial year appear automatically.
-- A company keeps one database across years. Earlier unsold vehicles carry into later inventory with their recorded costs. Purchases and sales lists show transactions in the selected year; vehicle margins for sales in the year include their earlier purchase and expense costs through that year's end.
-- Reports are vehicle margin reports, not statutory accounts. Expenses added in later years can change lifetime margin, but are not backdated into an earlier year's snapshot.
-- Earlier sold vehicles are excluded from the current workspace inventory unless they have activity in the selected year. Masters and document records are shared across years within the company.
-- Company files live in separate private document subfolders. The existing company's original files stay where they are.
-- Selecting another year never copies or deletes records.
+1. Deploy the latest main branch to Hostinger and press Ctrl + F5.
+2. Select your original company (the existing config.php database) and sign in as its admin.
+3. Open **Companies** in the left menu.
 
-## Keep the existing company
+Only an admin signed in to the original company may add connections or rename companies. Admins of another company cannot manage the global company list.
 
-Your existing config.php and database are the company key `existing`. No schema migration is required for existing data. Add optional values to config.php:
+## Set up three demo companies
 
-```php
-'company_name' => 'YOUR COMPANY NAME',
-'first_year' => 2020,
-```
+The browser demo already includes DEMO COMPANY ONE, TWO and THREE with separate sample records and only FY 2026–2027.
 
-The default earliest selectable year is 2000. Set first_year to your actual earliest financial-year start. Existing users may need to sign in once after deployment.
+For persistent demo companies on Hostinger:
 
-## Create three demo companies with real separate databases
+1. In Hostinger hPanel, create three NEW, empty MySQL databases and database users. Give each user access to its own database.
+2. In the software, open **Companies → Set up three demo companies**.
+3. Click **Set up** beside DEMO COMPANY ONE.
+4. Enter that database's Hostinger hostname, full database name, MySQL username and password.
+5. Click **Connect company**. The application tests the connection, creates the tables and adds fictional vehicles, bills and sales.
+6. Repeat for DEMO COMPANY TWO and DEMO COMPANY THREE, using different databases.
 
-The interactive browser preview already includes three isolated sample companies. The following steps create actual persistent demo databases on your hosting.
+No SSH installer is needed for this browser setup. Each freshly initialized database gets a copy of the admin account you are currently using: sign in with that same username and password. Future password resets and user edits remain independent per company.
 
-1. Back up the existing database and private document folder. Do not reinstall or seed the existing company.
-2. In Hostinger hPanel, create three NEW MySQL databases and database users: one each for demo_one, demo_two and demo_three. Give each user access only to its own database. Actual names usually have your account prefix.
-3. On Hostinger only, copy companies.example.php to companies.php. Replace all placeholders with the actual database names, usernames and passwords. Keep this file private and do not commit it. Each company must use a different database; duplicate connection identities are rejected.
-4. Redeploy main with the new source, preserving config.php, companies.php and storage. These local files must not be removed by deployment cleanup.
-5. In SSH, enter the project folder:
+Your original company stays intact alongside the three demos. Samples are only inserted into a completely empty database. The setup refuses to seed an existing database with business records.
 
-```bash
-cd ~/domains/thecarproject.in/public_html
-```
+## Add a real company
 
-6. Install each new company with a password you choose. Example for demo_one; run again for demo_two and demo_three by changing only the --company key:
+1. Create a separate empty database and MySQL user in Hostinger.
+2. Open **Companies → Add company**.
+3. Enter the company name and a stable company key, for example company_alpha.
+4. Enter the MySQL hostname, database name, database username and password from Hostinger.
+5. Click **Connect company**.
 
-```bash
-{
-  IFS= read -r -s -p "Company admin password (12-72 characters): " tcp_password
-  printf '\n'
-  php bin/install.php --company=demo_one --name="Demo Admin" --username=superadmin --password-stdin <<< "$tcp_password"
-  unset tcp_password
-}
-```
+An empty database is initialized automatically without sample transactions. A fully installed existing Car Project database can also be connected without overwriting its tables or user accounts; use that company's existing account to sign in. Other non-empty databases are rejected.
 
-This does not call PHP shell_exec and does not close your SSH terminal. Passwords are hidden. Use an existing company password-reset command with the matching --company key if an account already exists; never reinstall an existing database.
+Company keys must start with a lowercase letter and contain lowercase letters, digits, underscores or hyphens, 2–40 characters. Keys identify private document folders and cannot be renamed in the interface.
 
-7. Populate fictional records in the three NEW demo databases:
+## Edit a company
 
-```bash
-php bin/seed-demo.php --company=demo_one
-php bin/seed-demo.php --company=demo_two
-php bin/seed-demo.php --company=demo_three
-```
+1. Open **Companies** from the original company admin account.
+2. Click **Edit name** beside the company.
+3. Change the display name and click **Save name**.
 
-The seeder refuses the existing company and refuses any demo database that already contains business records or business masters. It does not reset or erase anything. Each demo gets different vehicle numbers and prices, two vehicles, separate bills, a sale, and a prior-year vehicle carried into this year. You see the three demo companies alongside your original company.
+Renaming does not change the company key, database, passwords, financial year or existing records. Connection changes are intentionally outside this form: edit your private configuration on Hostinger, test the connection and retain a backup. Never reuse another company's database name.
 
-8. Open your website and press Ctrl + F5. Choose DEMO COMPANY ONE, TWO or THREE, choose the financial year and sign in using that company's account.
+## Where company settings live
 
-## Add real companies later
+- config.php: original database connection and HTTPS setting.
+- companies.php: optional earlier manually configured connections; still supported.
+- storage/company-registry.json: connections and name overrides saved by the Companies page.
+- storage/company-registry.lock: coordinates simultaneous settings changes.
 
-Add a new stable key and connection in companies.php, create its separate database/user in Hostinger, and run the installer with --company=that_key. Do not reuse a demo database for real business without separately deciding how to remove sample data. No database creation permissions are needed by the web application.
+The saved registry overrides matching values from the earlier files. It contains database credentials, is written with mode 0600, and must remain outside direct web access. The repository root .htaccess denies storage and all private application paths. The new files are ignored by Git; preserve them during redeployments and include them in private backups. Do not paste their contents into chat or commit them.
 
-Keys must start with a lowercase letter and contain only lowercase letters, digits, underscore or hyphen, 2-40 characters total. Never rename a key after document uploads without moving its document folder as part of a planned migration.
+The PHP process needs write access to storage for browser-based company setup. Do not use 777 permissions. If settings cannot be saved, the app reports the error; a newly initialized database may need to be connected again using Add company without the demo option.
 
-## Reset an account in the correct company
+## Company and year separation
 
-```bash
-{
-  IFS= read -r -s -p "New password (12-72 characters): " tcp_password
-  printf '\n'
-  php bin/reset-password.php --company=demo_one --username=superadmin --password-stdin <<< "$tcp_password"
-  unset tcp_password
-}
-```
+- Every company has its own MySQL database, accounts, masters, vehicles, bills, audit log and private document folder.
+- Switching company signs you out; signing in is required for the selected company.
+- Old browser tabs cannot save into a changed company/year without reloading.
+- The only selectable year is 2026–2027. Entry dates outside that period are rejected.
+- One company database holds its history. Changing the visible year settings does not delete prior records.
+- Vehicle margins include earlier purchase costs; this is not a statutory accounting or tax system.
 
-Omitting --company selects your original company. It does not reset an identically named user in other companies.
+## Test on Hostinger before real use
 
-## Backups and security
+Confirm all three demo company inventories differ; add a master in one and verify it does not appear in another. Test duplicate database rejection, invalid credentials, name editing, authorization from another company's admin and restoration of a database/document/configuration backup.
 
-Back up every company's database and matching document folder. Keep config.php and companies.php out of Git and public file downloads. Root .htaccess already allows only application entry points/assets; do not remove it. HTTPS/session settings come from the original config.php. All companies currently run on the same configured MySQL server model; separate users reduce the impact of a mistaken connection credential. Every company retains the existing role permissions.
-
-## Verification before real use
-
-- Choose each of the three demos and confirm that vehicle numbers, bills and totals differ.
-- Create a master/bill in one demo, switch company and verify it does not appear in another.
-- Choose the previous year and confirm later transactions disappear; the unsold vehicle should still be available when returning to the current year.
-- Keep an old entry tab open, switch company/year in another tab, and confirm the old tab is rejected before saving.
-- Confirm that documents from one company cannot be downloaded using a document ID from another.
-- Check passwords and roles independently in each database.
-- Confirm a database/file backup can be restored.
-
-The application code and sample-data tests are supplied; Hostinger database creation, configuration and live end-to-end verification require your hosting account and are not performed by a GitHub commit.
+The code and sample preview are supplied, but the three actual MySQL databases still need to be created in your hosting account. A GitHub deployment cannot create databases without your Hostinger credentials and permissions.

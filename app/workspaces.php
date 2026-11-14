@@ -1,12 +1,9 @@
 <?php
 declare(strict_types=1);
 
-function currentFinancialYear():int {
- $now=new DateTimeImmutable('now',new DateTimeZone('Asia/Kolkata'));
- return (int)$now->format('Y')-((int)$now->format('n')<4?1:0);
-}
+function currentFinancialYear():int { return 2026; }
 function financialYearRange(int $year):array {
- if($year<2000||$year>2100)throw new RuntimeException('Invalid financial year.');
+ if($year!==2026)throw new RuntimeException('Invalid financial year.');
  return ['year'=>$year,'label'=>$year.'–'.($year+1),'start'=>$year.'-04-01','end'=>($year+1).'-03-31'];
 }
 function connectionIdentity(array $settings):string {
@@ -20,7 +17,7 @@ function companySettings(?array $base=null):array {
  static $cached=null;if($base===null&&$cached!==null)return $cached;
  $fromFile=$base===null;
  if($base===null){$path=dirname(__DIR__).'/config.php';if(!is_file($path))throw new RuntimeException('Configure config.php and run the CLI installer first.');$base=require $path;}
- $companies=['existing'=>array_merge($base,['name'=>$base['company_name']??'THE CAR PROJECT','first_year'=>(int)($base['first_year']??2000)])];
+ $companies=['existing'=>array_merge($base,['name'=>$base['company_name']??'THE CAR PROJECT','first_year'=>(int)(2026)])];
  $path=dirname(__DIR__).'/companies.php';
  if($fromFile&&is_file($path)){
   $extra=require $path;if(!is_array($extra))throw new RuntimeException('companies.php must return a company configuration array.');
@@ -29,12 +26,15 @@ function companySettings(?array $base=null):array {
    $companies[$key]=$settings;
   }
  }
+ if($fromFile){
+  $registry=readCompanyRegistry();
+  foreach($registry as $key=>$settings){if(isset($companies[$key]))$companies[$key]=array_merge($companies[$key],$settings);else $companies[$key]=$settings;}
+ }
  $seen=[];
  foreach($companies as $key=>&$settings){
   foreach(['dsn','username','password','name'] as $field)if(!isset($settings[$field])||!is_string($settings[$field]))throw new RuntimeException('Missing company connection setting: '.$key.' / '.$field);
   $settings['name']=trim($settings['name']);if($settings['name']===''||strlen($settings['name'])>160)throw new RuntimeException('Invalid company name.');
-  $settings['first_year']=(int)($settings['first_year']??2000);
-  if($settings['first_year']<2000||$settings['first_year']>currentFinancialYear()+1)throw new RuntimeException('Invalid first financial year for '.$key);
+  $settings['first_year']=2026;
   $identity=connectionIdentity($settings);
   if(isset($seen[$identity]))throw new RuntimeException('Companies must use separate database names: '.$key.' duplicates '.$seen[$identity]);
   $seen[$identity]=$key;
@@ -54,7 +54,7 @@ function ensureWorkspace():void {
  if(!isset($companies[$key])){unset($_SESSION['uid'],$_SESSION['auth_company']);$key='existing';}
  $_SESSION['company_key']=$key;
  $year=(int)($_SESSION['financial_year']??currentFinancialYear());
- if($year<$companies[$key]['first_year']||$year>currentFinancialYear()+1)$year=max(currentFinancialYear(),$companies[$key]['first_year']);
+ if($year!==2026){$year=2026;$_SESSION['workspace_token']=bin2hex(random_bytes(24));}
  $_SESSION['financial_year']=$year;
  $_SESSION['workspace_token']??=bin2hex(random_bytes(24));
 }
@@ -63,7 +63,7 @@ function workspaceInfo():array {
  return ['company_key'=>$key,'company_name'=>$companies[$key]['name'],'financial_year'=>financialYearRange((int)$_SESSION['financial_year'])];
 }
 function workspaceChoices():array {
- $result=[];foreach(companySettings() as $key=>$company){$years=[];for($y=currentFinancialYear()+1;$y>=$company['first_year'];$y--)$years[]=financialYearRange($y);$result[]=['key'=>$key,'name'=>$company['name'],'years'=>$years];}
+ $result=[];foreach(companySettings() as $key=>$company){$years=[financialYearRange(2026)];$result[]=['key'=>$key,'name'=>$company['name'],'years'=>$years];}
  return $result;
 }
 function workspaceSessionPayload():array {
@@ -76,7 +76,7 @@ function requireWorkspaceToken():void {
 function selectWorkspace(array $data):array {
  $key=$data['company_key']??'';$year=filter_var($data['financial_year']??null,FILTER_VALIDATE_INT);
  $companies=companySettings();
- if(!is_string($key)||!isset($companies[$key])||$year===false||$year<$companies[$key]['first_year']||$year>currentFinancialYear()+1)fail('Select a valid company and financial year.');
+ if(!is_string($key)||!isset($companies[$key])||$year!==2026)fail('Select a valid company and financial year.');
  if($key!==$_SESSION['company_key'])unset($_SESSION['uid'],$_SESSION['auth_company']);
  $_SESSION['company_key']=$key;$_SESSION['financial_year']=$year;
  $_SESSION['workspace_token']=bin2hex(random_bytes(24));$_SESSION['csrf']=bin2hex(random_bytes(32));
@@ -92,4 +92,11 @@ function documentDirectory():string {
  $key=$_SESSION['company_key'];$path=dirname(__DIR__).'/storage/documents'.($key==='existing'?'':'/'.$key);
  if(!is_dir($path)&&!mkdir($path,0700,true)&&!is_dir($path))fail('Unable to create the private company document folder.',500);
  return $path;
+}
+
+function readCompanyRegistry():array {
+ $path=dirname(__DIR__).'/storage/company-registry.json';
+ if(!is_file($path))return [];
+ $data=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
+ if(!is_array($data))throw new RuntimeException('Invalid company registry.');return $data;
 }

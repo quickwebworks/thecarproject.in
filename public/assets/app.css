@@ -52,3 +52,8 @@ svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.
 @media(max-width:680px){.workspace-banner{align-items:flex-start;padding:12px;gap:8px}.workspace-banner .btn{font-size:9px;max-width:125px;white-space:normal;padding:8px}.workspace-login{grid-template-columns:1fr}.loginform form{max-width:100%}.workspace-switch{margin-bottom:8px}}
 
 .loginform form{width:420px;max-width:100%}
+
+.company-actions{margin:-8px 0 20px}.company-help{margin-top:22px}.company-help-body{padding:5px 22px 18px;font-size:12px;color:#647780}
+.company-demo{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid var(--line)}
+.company-demo strong{display:block;color:var(--ink)}.company-demo small{display:block;margin-top:4px;font-size:10px}
+#company-config-form input[name="name"]{text-transform:uppercase}

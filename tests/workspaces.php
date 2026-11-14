@@ -4,6 +4,8 @@ require dirname(__DIR__).'/app/workspaces.php';
 function fail(string $message,int $status=422):never {throw new RuntimeException($message,$status);}
 function scopeCheck(bool $ok,string $name):void{if(!$ok)throw new RuntimeException($name);}
 function scopeReject(callable $fn):void{try{$fn();}catch(RuntimeException $e){return;}throw new LogicException('Expected rejection');}
+scopeCheck(currentFinancialYear()===2026,'Fixed supported year');
+scopeReject(fn()=>financialYearRange(2025));scopeReject(fn()=>financialYearRange(2027));
 $range=financialYearRange(2026);
 scopeCheck($range['start']==='2026-04-01'&&$range['end']==='2027-03-31','April–March range');
 $_SESSION=['financial_year'=>2026,'workspace_token'=>'company-a-token'];
