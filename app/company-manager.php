@@ -16,6 +16,7 @@ function saveCompanyConfiguration(array $data,array $actor):void {
  $operation=$data['operation']??'add';$name=in_array($operation,['add_year','seed_reports'],true)?'':txt($data,'name',160);
  $key=$operation==='add'?'c_'.substr(hash('sha256',$name),0,24):(string)($data['key']??'');
  if($operation==='add'&&in_array($data['key']??'', ['demo_one','demo_two','demo_three'],true))$key=$data['key'];
+ if($operation==='seed_reports'&&$key!=='existing')fail('Report sample data can only be added to THE CAR PROJECT (the original company). Other companies are not changed.',403);
  $metadata=['name'=>$name,'address'=>txt($data,'address',500,false),'contact_person'=>txt($data,'contact_person',120,false),'mobile'=>txt($data,'mobile',60,false),'email'=>txt($data,'email',254,false)];
  if($metadata['email']!==''&&!filter_var($metadata['email'],FILTER_VALIDATE_EMAIL))fail('Enter a valid email address.');
  if(isset($data['financial_year'])&&(string)$data['financial_year']!=='2026')fail('Select financial year 2026–2027.');
@@ -75,6 +76,7 @@ function saveCompanyConfiguration(array $data,array $actor):void {
   audit($operation==='seed_reports'?'Loaded 50 report demo vehicles: '.$key:($operation==='add_year'?'Added financial year '.$year.'–'.($year+1).': '.$key:($operation==='edit'?'Updated company: '.$key:'Connected company: '.$key)),0);
  }finally{flock($lock,LOCK_UN);fclose($lock);}
 }
+
 
 
 

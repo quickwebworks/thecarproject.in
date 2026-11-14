@@ -57,3 +57,9 @@ svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.
 .company-demo{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid var(--line)}
 .company-demo strong{display:block;color:var(--ink)}.company-demo small{display:block;margin-top:4px;font-size:10px}
 #company-config-form input[name="name"]{text-transform:uppercase}
+
+
+/* Keep full INR amounts readable in summary cards, including narrow screens. */
+.statvalue{font-size:clamp(18px,1.6vw,27px);letter-spacing:-.5px;overflow-wrap:anywhere}
+.charttop>div:first-child{min-width:0}.charttop strong{overflow-wrap:anywhere}
+@media(max-width:600px){.statvalue{font-size:20px}}

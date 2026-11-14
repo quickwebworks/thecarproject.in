@@ -25,6 +25,7 @@ try{
  rejectsCompany(fn()=>saveCompanyConfiguration(['operation'=>'add_year','key'=>'existing','year'=>2030],$actor));
  saveCompanyConfiguration(['operation'=>'edit','key'=>'existing','name'=>"Renamed O'Brien Motors",'address'=>'UPDATED ADDRESS'],$actor);
  checkCompany(readCompanyRegistry()['existing']['financial_years']===[2026,2027],'Profile edit preserves years');
+ try{saveCompanyConfiguration(['operation'=>'seed_reports','key'=>'demo_one'],$actor);throw new LogicException('Cross-company sample load accepted');}catch(RuntimeException $e){checkCompany($e->getCode()===403,'Other company sample load must be denied');}
  $_SESSION['company_key']='demo_one';rejectsCompany(fn()=>allowCompanyManagement());
  $_SESSION['company_key']='existing';$GLOBALS['role']='viewer';rejectsCompany(fn()=>allowCompanyManagement());
  echo "PASS: original-admin-only company management, safe name edits, single year, duplicate key rejection and no credentials in listings.\n";
