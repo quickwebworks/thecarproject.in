@@ -2,7 +2,7 @@
 declare(strict_types=1);
 if(PHP_SAPI!=='cli')exit('CLI only');
 function stopInstall(string $message):never {fwrite(STDERR,$message."\n");exit(1);}
-$options=getopt('', ['name:', 'username:', 'password-stdin']);
+$options=getopt('', ['name:', 'username:', 'password-stdin', 'company:']);
 $stdinMode=array_key_exists('password-stdin',$options);
 if($stdinMode){
  if(!isset($options['name'],$options['username'])||!is_string($options['name'])||!is_string($options['username']))stopInstall('With --password-stdin, supply --name and --username.');
@@ -27,7 +27,9 @@ if($stdinMode){
 if(strlen($password)<12||strlen($password)>128)stopInstall('Password must contain between 12 and 128 characters.');
 $configPath=dirname(__DIR__).'/config.php';
 if(!is_file($configPath))stopInstall('Create config.php from config.example.php and enter your database connection details first.');
-$config=require $configPath;
+require_once dirname(__DIR__).'/app/workspaces.php';
+try{[$companyKey,$config]=cliCompanySettings($options);}catch(Throwable $e){stopInstall($e->getMessage());}
+echo 'Installing company: '.$config['name']."\n";
 $db=new PDO($config['dsn'],$config['username'],$config['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 if($db->query("SHOW TABLES LIKE 'users'")->fetch())stopInstall('Tables already exist. Installer will not overwrite data.');
 $hash=password_hash($password,PASSWORD_DEFAULT);

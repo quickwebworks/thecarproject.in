@@ -2,7 +2,7 @@
 declare(strict_types=1);
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 function resetError(string $message):never {fwrite(STDERR,$message."\n");exit(1);}
-$options=getopt('', ['username:', 'password-stdin']);
+$options=getopt('', ['username:', 'password-stdin', 'company:']);
 $username=$options['username']??'';
 if(!is_string($username)||!preg_match('/^[a-zA-Z0-9_.-]{3,80}$/',$username)||!array_key_exists('password-stdin',$options)){
  resetError('Usage: php bin/reset-password.php --username=superadmin --password-stdin (pipe the new password on stdin)');
@@ -13,7 +13,9 @@ $password=rtrim($line,"\r\n");
 if(strlen($password)<12||strlen($password)>72)resetError('Use a password between 12 and 72 bytes.');
 $configPath=dirname(__DIR__).'/config.php';
 if(!is_file($configPath))resetError('config.php was not found. Run this command from the deployed project.');
-$config=require $configPath;
+require_once dirname(__DIR__).'/app/workspaces.php';
+try{[$companyKey,$config]=cliCompanySettings($options);}catch(Throwable $e){resetError($e->getMessage());}
+echo 'Selected company: '.$config['name']."\n";
 $hash=password_hash($password,PASSWORD_DEFAULT);
 unset($password,$line);
 $db=null;

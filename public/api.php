@@ -3,11 +3,13 @@ declare(strict_types=1);
 require dirname(__DIR__).'/app/bootstrap.php';
 try {
  $action=(string)($_GET['action']??'state');$method=$_SERVER['REQUEST_METHOD'];
- if($action==='session'&&$method==='GET')out(['user'=>empty($_SESSION['uid'])?null:user(),'csrf'=>$_SESSION['csrf']]);
+ if($action==='session'&&$method==='GET')out(workspaceSessionPayload());
  if($method==='POST'){
+  requireWorkspaceToken();
   if(!hash_equals($_SESSION['csrf'],(string)($_SERVER['HTTP_X_CSRF_TOKEN']??'')))fail('Security token expired. Reload the page.',403);
   $d=str_contains($_SERVER['CONTENT_TYPE']??'','application/json')?json_decode(file_get_contents('php://input'),true,512,JSON_THROW_ON_ERROR):$_POST;
   if(!is_array($d))fail('Invalid request.');
+  if($action==='select_workspace')out(selectWorkspace($d));
   if($action==='login'){
    $username=txt($d,'username',80);$pw=(string)($d['password']??'');
    $ident=hash('sha256',strtolower($username));$ipident=hash('sha256','ip:'.($_SERVER['REMOTE_ADDR']??''));
@@ -16,7 +18,7 @@ try {
    $hash=$u['password_hash']??'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
    $valid=password_verify($pw,$hash);
    if(!$u||!$valid||!$u['active']){query('INSERT INTO login_attempts(identifier) VALUES(?),(?)',[$ident,$ipident]);fail('Incorrect username or password.',401);}
-   session_regenerate_id(true);$_SESSION['uid']=$u['id'];$_SESSION['csrf']=bin2hex(random_bytes(32));audit('Signed in',(int)$u['id']);out(['user'=>user(),'csrf'=>$_SESSION['csrf']]);
+   session_regenerate_id(true);$_SESSION['uid']=$u['id'];$_SESSION['auth_company']=$_SESSION['company_key'];$_SESSION['csrf']=bin2hex(random_bytes(32));audit('Signed in',(int)$u['id']);out(workspaceSessionPayload());
   }
   $u=user();
   if($action==='logout'){$_SESSION=[];session_destroy();out(['ok'=>true]);}
@@ -30,11 +32,11 @@ try {
    allow(['admin','manager']);$v=master($d,'vehicle_id','vehicle');$b=master($d,'bank_id','bank',false);$c=master($d,'client_id','client',false);$y=master($d,'yard_id','yard',false);$p=master($d,'portal_id','portal',false);
    transaction(function()use($d,$v,$b,$c,$y,$p,$u){
     query('SELECT id FROM masters WHERE id=? FOR UPDATE',[$v]);
-    query('INSERT INTO purchases(vehicle_id,bank_id,client_id,yard_id,portal_id,purchase_date,amount,yard_expense,manager_name,manager_contact,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)',[$v,$b,$c,$y,$p,dateval($d,'purchase_date'),money($d,'amount'),money($d,'yard_expense'),txt($d,'manager_name',120,false),txt($d,'manager_contact',60,false),$u['id']]);audit('Recorded purchase',(int)db()->lastInsertId());});out(['ok'=>true]);
+    query('INSERT INTO purchases(vehicle_id,bank_id,client_id,yard_id,portal_id,purchase_date,amount,yard_expense,manager_name,manager_contact,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)',[$v,$b,$c,$y,$p,postingDate($d,'purchase_date'),money($d,'amount'),money($d,'yard_expense'),txt($d,'manager_name',120,false),txt($d,'manager_contact',60,false),$u['id']]);audit('Recorded purchase',(int)db()->lastInsertId());});out(['ok'=>true]);
   }
   if($action==='sale'){
    allow(['admin','manager']);$v=master($d,'vehicle_id','vehicle');$c=master($d,'client_id','client');
-   transaction(function()use($v,$c,$d,$u){$p=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();if(!$p)fail('Purchase this vehicle before selling it.');$date=dateval($d,'sale_date');if($date<$p['purchase_date'])fail('Sale date cannot precede purchase date.');
+   transaction(function()use($v,$c,$d,$u){$p=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();if(!$p)fail('Purchase this vehicle before selling it.');$date=postingDate($d,'sale_date');if($date<$p['purchase_date'])fail('Sale date cannot precede purchase date.');
     query('INSERT INTO sales(vehicle_id,client_id,sale_date,amount,sale_expense,salesperson,created_by) VALUES(?,?,?,?,?,?,?)',[$v,$c,$date,money($d,'amount'),money($d,'sale_expense'),txt($d,'salesperson',120,false),$u['id']]);audit('Recorded sale',(int)db()->lastInsertId());});out(['ok'=>true]);
   }
   if($action==='expense'){
@@ -44,6 +46,7 @@ try {
     $purchase=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();
     if(!$purchase)fail('Select a purchased vehicle.');
     $records=prepareExpenseBills($d,$purchase['purchase_date']);
+    foreach($records as $record)assertWorkspaceDate($record['expense_date']);
     // Validate the entire batch before inserting any rows.
     foreach($records as $record){
      if(query('SELECT id FROM expenses WHERE bill_no=?',[$record['bill_no']])->fetch())fail('Bill number '.$record['bill_no'].' already exists.');
@@ -67,21 +70,30 @@ try {
    allow(['admin','manager','accountant']);$v=master($d,'vehicle_id','vehicle');$type=master($d,'document_id','document');$f=$_FILES['file']??null;
    if(!$f||$f['error']!==UPLOAD_ERR_OK||$f['size']>10*1024*1024)fail('Upload a PDF, JPEG or PNG, maximum 10 MB.');
    $mime=(new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);$ext=['application/pdf'=>'pdf','image/jpeg'=>'jpg','image/png'=>'png'][$mime]??null;if(!$ext)fail('Only PDF, JPEG and PNG files are allowed.');
-   $filename=bin2hex(random_bytes(24)).'.'.$ext;$path=dirname(__DIR__).'/storage/documents/'.$filename;
+   $filename=bin2hex(random_bytes(24)).'.'.$ext;$path=documentDirectory().'/'.$filename;
    $expiry=empty($d['expiry_date'])?null:dateval($d,'expiry_date');if(!move_uploaded_file($f['tmp_name'],$path))fail('Unable to store file.');chmod($path,0600);
    try{transaction(function()use($v,$type,$f,$filename,$mime,$expiry,$u){query('INSERT INTO documents(vehicle_id,document_id,original_name,stored_name,mime,expiry_date,created_by) VALUES(?,?,?,?,?,?,?)',[$v,$type,mb_substr(basename($f['name']),0,255),$filename,$mime,$expiry,$u['id']]);audit('Uploaded document',(int)db()->lastInsertId());});}catch(Throwable $e){unlink($path);throw $e;}out(['ok'=>true]);
   }
   fail('Unknown action.',404);
  }
  $u=user();
+ requireWorkspaceToken();
  if($action==='download'){
-  $f=query('SELECT * FROM documents WHERE id=?',[(int)($_GET['id']??0)])->fetch();if(!$f)fail('Document not found.',404);$path=dirname(__DIR__).'/storage/documents/'.$f['stored_name'];if(!is_file($path))fail('File unavailable.',404);
+  $f=query('SELECT * FROM documents WHERE id=?',[(int)($_GET['id']??0)])->fetch();if(!$f)fail('Document not found.',404);$path=documentDirectory().'/'.$f['stored_name'];if(!is_file($path))fail('File unavailable.',404);
   header('Content-Type: '.$f['mime']);header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($f['original_name']));header('Content-Length: '.filesize($path));readfile($path);exit;
  }
  if($action==='state'){
-  $state=[];foreach(['masters','purchases','sales','expenses','expense_items','documents'] as $table){$cols=$table==='documents'?'id,vehicle_id,document_id,original_name,expiry_date,created_at':'*';$state[$table]=query("SELECT $cols FROM $table ORDER BY id DESC")->fetchAll();}
+  $range=workspaceInfo()['financial_year'];$end=$range['end'];$state=[];
+  $state['masters']=query('SELECT * FROM masters ORDER BY id DESC')->fetchAll();
+  $state['purchases']=query('SELECT * FROM purchases WHERE purchase_date<=? ORDER BY id DESC',[$end])->fetchAll();
+  $state['sales']=query('SELECT * FROM sales WHERE sale_date<=? ORDER BY id DESC',[$end])->fetchAll();
+  $state['expenses']=query('SELECT * FROM expenses WHERE expense_date<=? ORDER BY id DESC',[$end])->fetchAll();
+  $state['expense_items']=query('SELECT i.* FROM expense_items i JOIN expenses e ON e.id=i.expense_id WHERE e.expense_date<=? ORDER BY i.id DESC',[$end])->fetchAll();
+  $state['documents']=query('SELECT id,vehicle_id,document_id,original_name,expiry_date,created_at FROM documents ORDER BY id DESC')->fetchAll();
   $state['users']=$u['role']==='admin'?query('SELECT id,name,username,role,active FROM users ORDER BY id DESC')->fetchAll():[];
-  $state['audit']=query('SELECT a.*,u.name AS user_name FROM audit_log a JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 100')->fetchAll();out($state);
+  $auditEnd=(new DateTimeImmutable($end))->modify('+1 day')->format('Y-m-d');
+  $state['audit']=query('SELECT a.*,u.name AS user_name FROM audit_log a JOIN users u ON u.id=a.user_id WHERE a.created_at>=? AND a.created_at<? ORDER BY a.id DESC LIMIT 100',[$range['start'],$auditEnd])->fetchAll();
+  $state['workspace']=workspaceInfo();out($state);
  }
  fail('Not found.',404);
-}catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());fail($e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check server logs.',409);}catch(JsonException $e){fail('Invalid JSON.');}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());fail('Unable to complete request. Check server logs.',500);}
+}catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}

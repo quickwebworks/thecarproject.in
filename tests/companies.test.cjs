@@ -1,0 +1,20 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),saved=new Map();
+const source=fs.readFileSync(__dirname+'/../public/assets/app.js','utf8').replace(/init\(\);\s*$/,'');
+vm.runInNewContext(source+`
+demoRecords=demoSeed('existing');state=demoRecords;applySession(demoSession());
+assert.equal(companies.length,3);const firstVehicle=state.masters.find(m=>m.kind==='vehicle').name;
+const selected=demoRequest('select_workspace',{company_key:'second_company',financial_year:2026});
+assert.equal(selected.user,null);applySession(selected);
+const secondVehicle=state.masters.find(m=>m.kind==='vehicle').name;assert.notEqual(firstVehicle,secondVehicle);
+state.masters.push({id:999999,kind:'party',name:'ONLY COMPANY TWO'});persist();
+applySession(demoRequest('select_workspace',{company_key:'third_company',financial_year:2026}));
+const thirdVehicle=state.masters.find(m=>m.kind==='vehicle').name;assert.notEqual(thirdVehicle,secondVehicle);assert.notEqual(thirdVehicle,firstVehicle);
+assert.equal(state.masters.some(m=>m.name==='ONLY COMPANY TWO'),false);
+applySession(demoRequest('select_workspace',{company_key:'second_company',financial_year:2026}));
+assert.equal(state.masters.some(m=>m.name==='ONLY COMPANY TWO'),true);
+applySession(demoRequest('select_workspace',{company_key:'existing',financial_year:2025}));state=demoRequest('state');
+assert.equal(state.purchases.length,1);assert.equal(viewLedger().filter(p=>!p.sale).length,1);
+applySession(demoRequest('select_workspace',{company_key:'existing',financial_year:2026}));state=demoRequest('state');
+assert.equal(state.purchases.length,6);assert.equal(inYear('2026-04-01'),true);assert.equal(inYear('2027-03-31'),true);assert.equal(inYear('2026-03-31'),false);
+console.log('PASS: three separate demo companies, no master leakage, company switch signs out, and year switching preserves records.');
+`,{assert,console,Intl,Date,FormData,localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v)},setTimeout,clearTimeout});

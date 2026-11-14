@@ -21,7 +21,7 @@ PHP 8.4 recommended; source uses PHP 8.1-compatible language features. Do not st
 
 ## Installation on PHP / MySQL hosting
 
-1. Create an empty MySQL database and a database user restricted to that database. Keep credentials private.
+1. Create an empty MySQL database and a database user restricted to that database. Keep credentials private. For additional companies and three demo databases, follow [the company setup guide](docs/COMPANIES.md).
 2. Upload the application folder **outside the public web directory**, for example `/home/ACCOUNT/the-car-project`.
 3. Copy `config.example.php` to `config.php`. Enter the database DSN, user and password. Keep `https_only` set to `true` on hosting.
 4. In an interactive SSH terminal, run:
@@ -47,7 +47,7 @@ For local development only: set `https_only=false` in a local config and use `ph
 | Accountant | Read records, add expense/master/document records |
 | Viewer | Read records, reports and authenticated document downloads |
 
-Every authenticated role can see vehicle financial figures and client/party records. This is a single-business workspace, not multi-tenant software. Server-side authorization is applied independently of button visibility. Passwords are hashed with PHP `password_hash`; sessions use HttpOnly and SameSite cookies, 30-minute inactivity expiry and ID rotation at login. Login attempts are throttled by username and source IP. All POST requests require a session CSRF token.
+Every authenticated role can see vehicle financial figures and client/party records. Company workspaces now use separate MySQL databases and independent logins. See docs/COMPANIES.md for configuration and financial-year behaviour. Server-side authorization is applied independently of button visibility. Passwords are hashed with PHP `password_hash`; sessions use HttpOnly and SameSite cookies, 30-minute inactivity expiry and ID rotation at login. Login attempts are throttled by username and source IP. All POST requests require a session CSRF token.
 
 ## Financial definitions
 
@@ -123,3 +123,9 @@ Replace the full name and username as needed; keep the password out of command a
 Expense entry now keeps vehicle and party selection above repeatable bill rows. Each row requires its own unique bill number, bill date, item name and amount. Duplicate bill numbers within a submission or already recorded for any vehicle are rejected. All rows save in a single database transaction; a failed row rolls back the entire submission. Dates cannot precede the vehicle purchase date. Existing bills and the old multi-item API format remain supported. This update uses the existing expenses and expense_items tables, so no database migration or reinstall is required.
 
 Redeploy main in Hostinger and hard-refresh the browser. Run `node tests/expense-bills.test.cjs` and `php tests/expense-bills.php` for row validation and calculation tests; the PHP test needs config.php and performs no database writes. Browser testing used the sample preview; live Hostinger/MySQL acceptance remains to be checked after deployment.
+
+## Multi-company and financial years
+
+The sign-in page and dashboard now let you choose a company and an April–March financial year. Each company uses its own MySQL database and accounts; switching companies signs out and switching years keeps the same company login. Unsold prior-year vehicles remain available with their earlier costs. Stale tabs cannot save against a changed company/year. No migration or reinstall is required for your existing database.
+
+Three isolated sample companies are included in the interactive demo mode. To create the three persistent demo databases on Hostinger, use [docs/COMPANIES.md](docs/COMPANIES.md), companies.example.php, the --company option on the installer, and bin/seed-demo.php. Database credentials must be entered only on your host. A commit does not create the databases or update your private configuration.

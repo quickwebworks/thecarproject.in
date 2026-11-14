@@ -1,3 +1,5 @@
 /config.php
 /storage/documents/*
 !/storage/documents/.gitkeep
+
+/companies.php

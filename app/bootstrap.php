@@ -5,6 +5,7 @@ error_reporting(E_ALL);
 $configFile=dirname(__DIR__).'/config.php';
 if (!is_file($configFile)) { http_response_code(503); exit('Configure config.php and run the CLI installer first.'); }
 $config=require $configFile;
+require_once __DIR__.'/workspaces.php';
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: same-origin');
@@ -16,12 +17,18 @@ session_start(['cookie_httponly'=>true,'cookie_secure'=>(bool)$config['https_onl
 if(isset($_SESSION['last']) && time()-$_SESSION['last']>1800) { $_SESSION=[]; session_regenerate_id(true); }
 $_SESSION['last']=time();
 $_SESSION['csrf']??=bin2hex(random_bytes(32));
-function db():PDO { static $db; global $config; return $db??=new PDO($config['dsn'],$config['username'],$config['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES=>false]); }
+if(isset($_SESSION['uid'])&&!isset($_SESSION['auth_company']))unset($_SESSION['uid']);
+try{ensureWorkspace();}catch(Throwable $e){http_response_code(503);exit('Company setup needs attention: '.htmlspecialchars($e->getMessage(),ENT_QUOTES,'UTF-8'));}
+function db():PDO {
+ static $connections=[];$key=$_SESSION['company_key']??'existing';$companies=companySettings();
+ if(!isset($companies[$key]))fail('Unknown company.',409);$settings=$companies[$key];
+ return $connections[$key]??=new PDO($settings['dsn'],$settings['username'],$settings['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES=>false]);
+}
 function query(string $sql,array $params=[]):PDOStatement { $s=db()->prepare($sql);$s->execute($params);return $s; }
 function out(mixed $value,int $status=200):never { http_response_code($status);header('Content-Type: application/json');echo json_encode($value,JSON_THROW_ON_ERROR);exit; }
 class ApiError extends RuntimeException { public function __construct(string $message,public int $status=422){parent::__construct($message);} }
 function fail(string $message,int $status=422):never { throw new ApiError($message,$status); }
-function user():array { if(empty($_SESSION['uid']))fail('Please sign in.',401);$u=query('SELECT id,name,username,role,active FROM users WHERE id=?',[$_SESSION['uid']])->fetch();if(!$u||!$u['active'])fail('Account unavailable.',401);return $u; }
+function user():array { if(empty($_SESSION['uid'])||($_SESSION['auth_company']??null)!==$_SESSION['company_key'])fail('Please sign in to the selected company.',401);$u=query('SELECT id,name,username,role,active FROM users WHERE id=?',[$_SESSION['uid']])->fetch();if(!$u||!$u['active'])fail('Account unavailable.',401);return $u; }
 function allow(array $roles):array { $u=user();if(!in_array($u['role'],$roles,true))fail('Your user type does not permit this action.',403);return $u; }
 function entryText(string $key,string $value):string {
  return in_array($key,['name','contact','manager_name','manager_contact','salesperson','address','city','details','bill_no'],true)?mb_strtoupper($value,'UTF-8'):$value;

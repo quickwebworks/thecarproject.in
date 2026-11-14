@@ -1,0 +1,95 @@
+<?php
+declare(strict_types=1);
+
+function currentFinancialYear():int {
+ $now=new DateTimeImmutable('now',new DateTimeZone('Asia/Kolkata'));
+ return (int)$now->format('Y')-((int)$now->format('n')<4?1:0);
+}
+function financialYearRange(int $year):array {
+ if($year<2000||$year>2100)throw new RuntimeException('Invalid financial year.');
+ return ['year'=>$year,'label'=>$year.'–'.($year+1),'start'=>$year.'-04-01','end'=>($year+1).'-03-31'];
+}
+function connectionIdentity(array $settings):string {
+ $dsn=(string)($settings['dsn']??'');
+ if(!str_starts_with($dsn,'mysql:'))throw new RuntimeException('Company connections must use MySQL.');
+ $parts=[];foreach(explode(';',substr($dsn,6)) as $part){$pair=explode('=',$part,2);if(count($pair)===2)$parts[strtolower(trim($pair[0]))]=trim($pair[1]);}
+ if(empty($parts['dbname']))throw new RuntimeException('A company database name is required.');
+ return strtolower(($parts['host']??'localhost').':'.($parts['port']??'3306').'/'.$parts['dbname']);
+}
+function companySettings(?array $base=null):array {
+ static $cached=null;if($base===null&&$cached!==null)return $cached;
+ $fromFile=$base===null;
+ if($base===null){$path=dirname(__DIR__).'/config.php';if(!is_file($path))throw new RuntimeException('Configure config.php and run the CLI installer first.');$base=require $path;}
+ $companies=['existing'=>array_merge($base,['name'=>$base['company_name']??'THE CAR PROJECT','first_year'=>(int)($base['first_year']??2000)])];
+ $path=dirname(__DIR__).'/companies.php';
+ if($fromFile&&is_file($path)){
+  $extra=require $path;if(!is_array($extra))throw new RuntimeException('companies.php must return a company configuration array.');
+  foreach($extra as $key=>$settings){
+   if(!is_string($key)||!preg_match('/^[a-z][a-z0-9_-]{1,39}$/',$key)||$key==='existing'||!is_array($settings))throw new RuntimeException('Invalid or reserved company key in companies.php.');
+   $companies[$key]=$settings;
+  }
+ }
+ $seen=[];
+ foreach($companies as $key=>&$settings){
+  foreach(['dsn','username','password','name'] as $field)if(!isset($settings[$field])||!is_string($settings[$field]))throw new RuntimeException('Missing company connection setting: '.$key.' / '.$field);
+  $settings['name']=trim($settings['name']);if($settings['name']===''||strlen($settings['name'])>160)throw new RuntimeException('Invalid company name.');
+  $settings['first_year']=(int)($settings['first_year']??2000);
+  if($settings['first_year']<2000||$settings['first_year']>currentFinancialYear()+1)throw new RuntimeException('Invalid first financial year for '.$key);
+  $identity=connectionIdentity($settings);
+  if(isset($seen[$identity]))throw new RuntimeException('Companies must use separate database names: '.$key.' duplicates '.$seen[$identity]);
+  $seen[$identity]=$key;
+ }
+ unset($settings);if($fromFile)$cached=$companies;return $companies;
+}
+function cliCompanySettings(array $options):array {
+ $key=$options['company']??'existing';
+ if(!is_string($key))throw new RuntimeException('Use one --company key.');
+ $companies=companySettings();
+ if(!isset($companies[$key]))throw new RuntimeException('Unknown company key. Check companies.php.');
+ return [$key,$companies[$key]];
+}
+function ensureWorkspace():void {
+ $companies=companySettings();
+ $key=(string)($_SESSION['company_key']??'existing');
+ if(!isset($companies[$key])){unset($_SESSION['uid'],$_SESSION['auth_company']);$key='existing';}
+ $_SESSION['company_key']=$key;
+ $year=(int)($_SESSION['financial_year']??currentFinancialYear());
+ if($year<$companies[$key]['first_year']||$year>currentFinancialYear()+1)$year=max(currentFinancialYear(),$companies[$key]['first_year']);
+ $_SESSION['financial_year']=$year;
+ $_SESSION['workspace_token']??=bin2hex(random_bytes(24));
+}
+function workspaceInfo():array {
+ ensureWorkspace();$key=$_SESSION['company_key'];$companies=companySettings();
+ return ['company_key'=>$key,'company_name'=>$companies[$key]['name'],'financial_year'=>financialYearRange((int)$_SESSION['financial_year'])];
+}
+function workspaceChoices():array {
+ $result=[];foreach(companySettings() as $key=>$company){$years=[];for($y=currentFinancialYear()+1;$y>=$company['first_year'];$y--)$years[]=financialYearRange($y);$result[]=['key'=>$key,'name'=>$company['name'],'years'=>$years];}
+ return $result;
+}
+function workspaceSessionPayload():array {
+ return ['user'=>empty($_SESSION['uid'])?null:user(),'csrf'=>$_SESSION['csrf'],'workspace_token'=>$_SESSION['workspace_token'],'workspace'=>workspaceInfo(),'companies'=>workspaceChoices()];
+}
+function requireWorkspaceToken():void {
+ $token=(string)($_SERVER['HTTP_X_WORKSPACE_TOKEN']??($_GET['workspace_token']??''));
+ if(!hash_equals($_SESSION['workspace_token'],$token))fail('Company or financial year changed in another tab. Reload this page before continuing.',409);
+}
+function selectWorkspace(array $data):array {
+ $key=$data['company_key']??'';$year=filter_var($data['financial_year']??null,FILTER_VALIDATE_INT);
+ $companies=companySettings();
+ if(!is_string($key)||!isset($companies[$key])||$year===false||$year<$companies[$key]['first_year']||$year>currentFinancialYear()+1)fail('Select a valid company and financial year.');
+ if($key!==$_SESSION['company_key'])unset($_SESSION['uid'],$_SESSION['auth_company']);
+ $_SESSION['company_key']=$key;$_SESSION['financial_year']=$year;
+ $_SESSION['workspace_token']=bin2hex(random_bytes(24));$_SESSION['csrf']=bin2hex(random_bytes(32));
+ session_regenerate_id(true);return workspaceSessionPayload();
+}
+function assertWorkspaceDate(string $date):string {
+ $range=financialYearRange((int)$_SESSION['financial_year']);
+ if($date<$range['start']||$date>$range['end'])fail('Entry date must fall within financial year '.$range['label'].' ('.$range['start'].' to '.$range['end'].').');
+ return $date;
+}
+function postingDate(array $data,string $key):string {return assertWorkspaceDate(dateval($data,$key));}
+function documentDirectory():string {
+ $key=$_SESSION['company_key'];$path=dirname(__DIR__).'/storage/documents'.($key==='existing'?'':'/'.$key);
+ if(!is_dir($path)&&!mkdir($path,0700,true)&&!is_dir($path))fail('Unable to create the private company document folder.',500);
+ return $path;
+}
