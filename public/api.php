@@ -43,7 +43,9 @@ try {
    out(['id'=>$newId,'ok'=>true]);
   }
   if($action==='purchase'){
-   allow(['admin','manager']);$v=master($d,'vehicle_id','vehicle');$b=master($d,'bank_id','bank',false);$c=master($d,'client_id','client',false);$y=master($d,'yard_id','yard',false);$p=master($d,'portal_id','portal',false);
+   allow(['admin','manager']);
+   if(array_key_exists('id',$d)){require_once dirname(__DIR__).'/app/purchase-editor.php';updatePurchaseRecord($d);out(['ok'=>true]);}
+   $v=master($d,'vehicle_id','vehicle');$b=master($d,'bank_id','bank',false);$c=master($d,'client_id','client',false);$y=master($d,'yard_id','yard',false);$p=master($d,'portal_id','portal',false);
    transaction(function()use($d,$v,$b,$c,$y,$p,$u){
     query('SELECT id FROM masters WHERE id=? FOR UPDATE',[$v]);
     query('INSERT INTO purchases(vehicle_id,bank_id,client_id,yard_id,portal_id,purchase_date,amount,yard_expense,manager_name,manager_contact,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)',[$v,$b,$c,$y,$p,postingDate($d,'purchase_date'),money($d,'amount'),money($d,'yard_expense'),txt($d,'manager_name',120,false),txt($d,'manager_contact',60,false),$u['id']]);audit('Recorded purchase',(int)db()->lastInsertId());});out(['ok'=>true]);
@@ -114,3 +116,4 @@ try {
  }
  fail('Not found.',404);
 }catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}
+
