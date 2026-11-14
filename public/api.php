@@ -56,19 +56,19 @@ try {
     query('INSERT INTO sales(vehicle_id,client_id,sale_date,amount,sale_expense,salesperson,created_by) VALUES(?,?,?,?,?,?,?)',[$v,$c,$date,money($d,'amount'),money($d,'sale_expense'),txt($d,'salesperson',120,false),$u['id']]);audit('Recorded sale',(int)db()->lastInsertId());});out(['ok'=>true]);
   }
   if($action==='expense'){
-   allow(['admin','manager','accountant']);$v=master($d,'vehicle_id','vehicle');$p=master($d,'party_id','party');
+   allow(['admin','manager','accountant']);$v=master($d,'vehicle_id','vehicle');
    require_once dirname(__DIR__).'/app/expense-bills.php';
-   transaction(function()use($v,$p,$d,$u){
+   transaction(function()use($v,$d,$u){
     $purchase=query('SELECT * FROM purchases WHERE vehicle_id=? FOR UPDATE',[$v])->fetch();
     if(!$purchase)fail('Select a purchased vehicle.');
     $records=prepareExpenseBills($d,$purchase['purchase_date']);
-    foreach($records as $record)assertWorkspaceDate($record['expense_date']);
+    foreach($records as $record){assertWorkspaceDate($record['expense_date']);master($record,'party_id','party');}
     // Validate the entire batch before inserting any rows.
     foreach($records as $record){
      if(query('SELECT id FROM expenses WHERE bill_no=?',[$record['bill_no']])->fetch())fail('Bill number '.$record['bill_no'].' already exists.');
     }
     foreach($records as $record){
-     query('INSERT INTO expenses(vehicle_id,party_id,bill_no,expense_date,created_by) VALUES(?,?,?,?,?)',[$v,$p,$record['bill_no'],$record['expense_date'],$u['id']]);
+     query('INSERT INTO expenses(vehicle_id,party_id,bill_no,expense_date,created_by) VALUES(?,?,?,?,?)',[$v,$record['party_id'],$record['bill_no'],$record['expense_date'],$u['id']]);
      $id=(int)db()->lastInsertId();
      foreach($record['items'] as $item)query('INSERT INTO expense_items(expense_id,name,qty,total) VALUES(?,?,?,?)',[$id,$item['name'],$item['qty'],$item['total']]);
      audit('Recorded expense',$id);
@@ -116,4 +116,5 @@ try {
  }
  fail('Not found.',404);
 }catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}
+
 

@@ -67,3 +67,9 @@ svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.
 
 /* SVG geometry works with the existing strict style-src policy. */
 .chartplot{overflow-x:auto}.transaction-chart{display:block;width:100%;min-width:540px;height:auto}.inventory-meter{display:block;width:100%;height:10px;margin:12px 0;border-radius:5px;overflow:hidden}.chartwrap .chartfoot{margin-top:12px}
+
+
+.expense-bill-header,.expense-bill-row{grid-template-columns:minmax(150px,1.35fr) minmax(100px,1fr) minmax(135px,1.1fr) minmax(130px,1.3fr) minmax(110px,1fr) 32px;align-items:start}.bill-party .selectrow select{min-width:0;width:100%;padding:11px 8px;font-size:12px}.bill-party-search{margin-bottom:5px}.bill-date-error{display:block;min-height:1em;color:#c0392b;font-size:10px;margin-top:4px}.bill-cell input[aria-invalid="true"]{border-color:#c0392b}#expense-purchase-date{background:#f3f6f6}
+@media(max-width:950px){.expense-bill-header{display:none}.expense-bill-row{grid-template-columns:1fr 1fr;padding:14px;border:1px solid var(--line);border-radius:10px}.bill-cell>span{display:block;margin-bottom:5px;font-size:10px;font-weight:600}.bill-party,.expense-bill-row .remove-bill-row{grid-column:1/-1}}
+@media(max-width:420px){.expense-bill-row{grid-template-columns:1fr}.expense-bill-row .bill-cell{grid-column:1/-1}}
+.bill-party .selectrow select{border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);height:40px}.bill-party .selectrow select:focus{outline:2px solid var(--accent);border-color:transparent}
