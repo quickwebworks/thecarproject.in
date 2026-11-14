@@ -9,11 +9,11 @@ function allowCompanyManagement():array {
 }
 function companyPublicDetails():array {
  $rows=[];
- foreach(companySettings() as $key=>$c)$rows[]=['key'=>$key,'name'=>$c['name'],'address'=>$c['address']??'','contact_person'=>$c['contact_person']??'','mobile'=>$c['mobile']??'','email'=>$c['email']??'','financial_year'=>'2026–2027','original'=>$key==='existing'];
+ foreach(companySettings() as $key=>$c)$rows[]=['key'=>$key,'name'=>$c['name'],'address'=>$c['address']??'','contact_person'=>$c['contact_person']??'','mobile'=>$c['mobile']??'','email'=>$c['email']??'','financial_years'=>array_map('financialYearRange',companyFinancialYears($c)),'original'=>$key==='existing'];
  return $rows;
 }
 function saveCompanyConfiguration(array $data,array $actor):void {
- $operation=$data['operation']??'add';$name=txt($data,'name',160);
+ $operation=$data['operation']??'add';$name=$operation==='add_year'?'':txt($data,'name',160);
  $key=$operation==='add'?'c_'.substr(hash('sha256',$name),0,24):(string)($data['key']??'');
  if($operation==='add'&&in_array($data['key']??'', ['demo_one','demo_two','demo_three'],true))$key=$data['key'];
  $metadata=['name'=>$name,'address'=>txt($data,'address',500,false),'contact_person'=>txt($data,'contact_person',120,false),'mobile'=>txt($data,'mobile',60,false),'email'=>txt($data,'email',254,false)];
@@ -25,7 +25,13 @@ function saveCompanyConfiguration(array $data,array $actor):void {
  try{
   $registry=readCompanyRegistry();$configured=companySettings();foreach($registry as $rk=>$rc)$configured[$rk]=array_merge($configured[$rk]??[],$rc);
   foreach($configured as $otherKey=>$other)if($otherKey!==$key&&mb_strtoupper($other['name'],'UTF-8')===$name)fail('A company with this name already exists.',409);
-  if($operation==='edit'){
+  if($operation==='add_year'){
+   if(!isset($configured[$key]))fail('Company not found.',404);
+   $year=filter_var($data['year']??null,FILTER_VALIDATE_INT);$years=companyFinancialYears($configured[$key]);
+   if(in_array($year,$years,true))fail('That financial year already exists.',409);
+   if($year!==max($years)+1||$year>2100)fail('Add only the next financial year.');
+   $years[]=$year;$registry[$key]=array_merge($registry[$key]??[],['financial_years'=>$years]);
+  }elseif($operation==='edit'){
    if(!isset($configured[$key]))fail('Company not found.',404);
    $registry[$key]=array_merge($registry[$key]??[],$metadata);
   }elseif($operation==='add'){
@@ -56,7 +62,8 @@ function saveCompanyConfiguration(array $data,array $actor):void {
   }else fail('Unknown company operation.');
   writePrivateCompanyJson($path,$registry);
   if(isset($jobPath)&&is_file($jobPath))unlink($jobPath);
-  audit($operation==='edit'?'Updated company: '.$key:'Connected company: '.$key,0);
+  audit($operation==='add_year'?'Added financial year '.$year.'–'.($year+1).': '.$key:($operation==='edit'?'Updated company: '.$key:'Connected company: '.$key),0);
  }finally{flock($lock,LOCK_UN);fclose($lock);}
 }
+
 

@@ -19,6 +19,12 @@ try{
  $saved=readCompanyRegistry();checkCompany($saved['existing']['name']==="RENAMED O'BRIEN MOTORS",'Name saved safely');checkCompany(!isset($saved['existing']['dsn'],$saved['existing']['password']),'Profile editing must not change database connection');
  rejectsCompany(fn()=>saveCompanyConfiguration(['operation'=>'add','key'=>'existing','name'=>'DUPLICATE'],$actor));
  rejectsCompany(fn()=>saveCompanyConfiguration(['operation'=>'edit','key'=>'unknown_company','name'=>'UNKNOWN'],$actor));
+ saveCompanyConfiguration(['operation'=>'add_year','key'=>'existing','year'=>2027],$actor);
+ $saved=readCompanyRegistry();checkCompany($saved['existing']['financial_years']===[2026,2027],'Next year saved');checkCompany($saved['existing']['name']==="RENAMED O'BRIEN MOTORS",'Name preserved when adding year');checkCompany(!isset($saved['existing']['dsn'],$saved['existing']['password']),'Year does not replace connection');
+ rejectsCompany(fn()=>saveCompanyConfiguration(['operation'=>'add_year','key'=>'existing','year'=>2027],$actor));
+ rejectsCompany(fn()=>saveCompanyConfiguration(['operation'=>'add_year','key'=>'existing','year'=>2030],$actor));
+ saveCompanyConfiguration(['operation'=>'edit','key'=>'existing','name'=>"Renamed O'Brien Motors",'address'=>'UPDATED ADDRESS'],$actor);
+ checkCompany(readCompanyRegistry()['existing']['financial_years']===[2026,2027],'Profile edit preserves years');
  $_SESSION['company_key']='demo_one';rejectsCompany(fn()=>allowCompanyManagement());
  $_SESSION['company_key']='existing';$GLOBALS['role']='viewer';rejectsCompany(fn()=>allowCompanyManagement());
  echo "PASS: original-admin-only company management, safe name edits, single year, duplicate key rejection and no credentials in listings.\n";
@@ -27,4 +33,5 @@ try{
  foreach(glob($root.'/app/*')?:[] as $file)unlink($file);
  unlink($root.'/config.php');rmdir($root.'/storage');rmdir($root.'/app');rmdir($root);
 }
+
 

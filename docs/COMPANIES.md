@@ -6,7 +6,7 @@ Sign in to the original company as an administrator and open **Companies**.
 
 **Add company** asks only for company name, financial year (2026–2027), address, contact person, mobile number and email. The server generates the company key, database name, database username and a random password. Hostinger creates the database and the application initializes its tables and copies the current administrator login hash. Choose the new company using **Change company / year**, then sign in with your current administrator username and password.
 
-**Edit company** updates the name, address and contact information. It preserves the database connection, records and users. Financial year is currently fixed to 2026–2027; editing it does not move or copy existing transactions.
+**Edit company** updates the name, address and contact information. It preserves the database connection, records and users. New companies start with 2026–2027. Later years are added individually from Edit company; adding a year does not move or copy transactions.
 
 The three **Create demo** buttons use the same automatic setup and add fictional samples to a new empty database. They never seed an existing company database. The browser demo simulates separate company datasets; it does not provision real MySQL databases.
 
@@ -49,3 +49,15 @@ Deploy the latest code and retry the same company name. Generated database passw
 ## Database name too long (Hosting:9999)
 
 New company databases now use a short alphanumeric suffix; the API adds the hosting-account prefix, and PHP stores that same full name for its connection. The complete generated name is kept within a conservative 16-character budget, including the account prefix. On retry, explicitly rejected setup records are regenerated automatically with short names. Do not delete the setup file: retry the same company name after deploying the update. Records already marked provisioned, schema_ready, initialized or requesting are never renamed by this correction.
+
+
+## Add the next financial year to an existing company
+
+1. Sign in to the original company as administrator and open **Companies**.
+2. Click **Edit company** on the company you want to extend.
+3. Click **Add financial year 2027–2028** and confirm **Add 2027–2028**.
+4. Close the editor, open **Change company / year**, select that company and **2027–2028**, then open the workspace.
+
+The next year runs from 1 April 2027 to 31 March 2028. Repeat the same process later for 2028–2029. Only the next year can be added; duplicate and skipped years are rejected. Only explicitly added years appear, beginning with 2026–2027.
+
+The company uses its existing database and login accounts. Masters and documents remain shared within the company. Unsold vehicles and their earlier purchase/expense costs remain available. Previous-year sales remain in their original year; transactions are not duplicated. You can switch back to older years. This is not an accounting closing process and does not post tax, cash or bank opening balances. No Hostinger API call, new database, migration or installer run is needed to add a financial year. Company details being edited remain in the editor after adding the year.

@@ -3,9 +3,20 @@ declare(strict_types=1);
 
 function currentFinancialYear():int { return 2026; }
 function financialYearRange(int $year):array {
- if($year!==2026)throw new RuntimeException('Invalid financial year.');
+ if($year<2026||$year>2100)throw new RuntimeException('Invalid financial year.');
  return ['year'=>$year,'label'=>$year.'–'.($year+1),'start'=>$year.'-04-01','end'=>($year+1).'-03-31'];
 }
+function companyFinancialYears(array $company):array {
+ $years=$company['financial_years']??[2026];
+ if(!is_array($years))throw new RuntimeException('Invalid financial year settings.');
+ $result=[2026];
+ foreach($years as $year){
+  if(!is_int($year)||$year<2026||$year>2100)throw new RuntimeException('Financial years must start from 2026 and be explicitly added.');
+  $result[]=$year;
+ }
+ $result=array_values(array_unique($result));sort($result,SORT_NUMERIC);return $result;
+}
+
 function connectionIdentity(array $settings):string {
  $dsn=(string)($settings['dsn']??'');
  if(!str_starts_with($dsn,'mysql:'))throw new RuntimeException('Company connections must use MySQL.');
@@ -34,7 +45,7 @@ function companySettings(?array $base=null):array {
  foreach($companies as $key=>&$settings){
   foreach(['dsn','username','password','name'] as $field)if(!isset($settings[$field])||!is_string($settings[$field]))throw new RuntimeException('Missing company connection setting: '.$key.' / '.$field);
   $settings['name']=trim($settings['name']);if($settings['name']===''||strlen($settings['name'])>160)throw new RuntimeException('Invalid company name.');
-  $settings['first_year']=2026;
+  $settings['first_year']=2026;$settings['financial_years']=companyFinancialYears($settings);
   $identity=connectionIdentity($settings);
   if(isset($seen[$identity]))throw new RuntimeException('Companies must use separate database names: '.$key.' duplicates '.$seen[$identity]);
   $seen[$identity]=$key;
@@ -54,7 +65,7 @@ function ensureWorkspace():void {
  if(!isset($companies[$key])){unset($_SESSION['uid'],$_SESSION['auth_company']);$key='existing';}
  $_SESSION['company_key']=$key;
  $year=(int)($_SESSION['financial_year']??currentFinancialYear());
- if($year!==2026){$year=2026;$_SESSION['workspace_token']=bin2hex(random_bytes(24));}
+ if(!in_array($year,companyFinancialYears($companies[$key]),true)){$year=2026;$_SESSION['workspace_token']=bin2hex(random_bytes(24));}
  $_SESSION['financial_year']=$year;
  $_SESSION['workspace_token']??=bin2hex(random_bytes(24));
 }
@@ -63,7 +74,7 @@ function workspaceInfo():array {
  return ['company_key'=>$key,'company_name'=>$companies[$key]['name'],'financial_year'=>financialYearRange((int)$_SESSION['financial_year'])];
 }
 function workspaceChoices():array {
- $result=[];foreach(companySettings() as $key=>$company){$years=[financialYearRange(2026)];$result[]=['key'=>$key,'name'=>$company['name'],'years'=>$years];}
+ $result=[];foreach(companySettings() as $key=>$company){$years=array_map('financialYearRange',companyFinancialYears($company));$result[]=['key'=>$key,'name'=>$company['name'],'years'=>$years];}
  return $result;
 }
 function workspaceSessionPayload():array {
@@ -80,7 +91,7 @@ function requireWorkspaceToken():void {
 function selectWorkspace(array $data):array {
  $key=$data['company_key']??'';$year=filter_var($data['financial_year']??null,FILTER_VALIDATE_INT);
  $companies=companySettings();
- if(!is_string($key)||!isset($companies[$key])||$year!==2026)fail('Select a valid company and financial year.');
+ if(!is_string($key)||!isset($companies[$key])||!in_array($year,companyFinancialYears($companies[$key]),true))fail('Select a valid company and financial year.');
  if($key!==$_SESSION['company_key'])unset($_SESSION['uid'],$_SESSION['auth_company']);
  $_SESSION['company_key']=$key;$_SESSION['financial_year']=$year;
  $_SESSION['workspace_token']=bin2hex(random_bytes(24));$_SESSION['csrf']=bin2hex(random_bytes(32));
@@ -104,4 +115,5 @@ function readCompanyRegistry():array {
  $data=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
  if(!is_array($data))throw new RuntimeException('Invalid company registry.');return $data;
 }
+
 

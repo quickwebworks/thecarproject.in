@@ -12,13 +12,21 @@ const thirdVehicle=state.masters.find(m=>m.kind==='vehicle').name;assert.notEqua
 assert.equal(state.masters.some(m=>m.name==='ONLY COMPANY TWO'),false);
 applySession(demoRequest('select_workspace',{company_key:'second_company',financial_year:2026}));
 assert.equal(state.masters.some(m=>m.name==='ONLY COMPANY TWO'),true);
-assert.throws(()=>demoRequest('select_workspace',{company_key:'existing',financial_year:2025}),/Only financial year/);
+assert.throws(()=>demoRequest('select_workspace',{company_key:'existing',financial_year:2025}),/added financial year/);
 assert.equal(companies.every(c=>c.years.length===1&&c.years[0].year===2026),true);
 applySession(demoRequest('select_workspace',{company_key:'existing',financial_year:2026}));state=demoRequest('state');
 assert.equal(state.purchases.length,6);assert.equal(inYear('2026-04-01'),true);assert.equal(inYear('2027-03-31'),true);assert.equal(inYear('2026-03-31'),false);
-user={id:1,name:'QA',role:'admin'};
+user={id:1,name:'QA',role:'admin'};demoUser=user;
 demoRequest('company_save',{operation:'edit',key:'existing',name:'RENAMED COMPANY'});assert.equal(demoSession().workspace.company_name,'RENAMED COMPANY');
 demoRequest('company_save',{operation:'add',key:'new_company',name:'NEW COMPANY'});assert.equal(demoSession().companies.length,4);
 assert.throws(()=>demoRequest('company_save',{operation:'add',key:'new_company',name:'DUPLICATE'}),/already exists/);
+demoRequest('company_save',{operation:'add_year',key:'existing',year:2027});applySession(demoSession());
+assert.equal(companies.find(c=>c.key==='existing').years.length,2);assert.equal(companies.find(c=>c.key==='second_company').years.length,1);
+assert.throws(()=>demoRequest('company_save',{operation:'add_year',key:'existing',year:2027}),/already exists/);
+assert.throws(()=>demoRequest('company_save',{operation:'add_year',key:'existing',year:2030}),/next financial year/);
+applySession(demoRequest('select_workspace',{company_key:'existing',financial_year:2027}));state=demoRequest('state');
+assert.equal(viewLedger().filter(p=>!p.sale).length,3);assert.equal(yearPurchases().length,0);assert.equal(yearSales().length,0);
+assert.equal(viewLedger().filter(p=>!p.sale).reduce((sum,p)=>sum+p.cost,0),1951000);
 console.log('PASS: three separate demo companies, no master leakage, company switch signs out, and year switching preserves records.');
 `,{assert,console,Intl,Date,FormData,localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v)},setTimeout,clearTimeout});
+
