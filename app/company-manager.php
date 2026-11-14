@@ -13,7 +13,7 @@ function companyPublicDetails():array {
  return $rows;
 }
 function saveCompanyConfiguration(array $data,array $actor):void {
- $operation=$data['operation']??'add';$name=$operation==='add_year'?'':txt($data,'name',160);
+ $operation=$data['operation']??'add';$name=in_array($operation,['add_year','seed_reports'],true)?'':txt($data,'name',160);
  $key=$operation==='add'?'c_'.substr(hash('sha256',$name),0,24):(string)($data['key']??'');
  if($operation==='add'&&in_array($data['key']??'', ['demo_one','demo_two','demo_three'],true))$key=$data['key'];
  $metadata=['name'=>$name,'address'=>txt($data,'address',500,false),'contact_person'=>txt($data,'contact_person',120,false),'mobile'=>txt($data,'mobile',60,false),'email'=>txt($data,'email',254,false)];
@@ -25,7 +25,17 @@ function saveCompanyConfiguration(array $data,array $actor):void {
  try{
   $registry=readCompanyRegistry();$configured=companySettings();foreach($registry as $rk=>$rc)$configured[$rk]=array_merge($configured[$rk]??[],$rc);
   foreach($configured as $otherKey=>$other)if($otherKey!==$key&&mb_strtoupper($other['name'],'UTF-8')===$name)fail('A company with this name already exists.',409);
-  if($operation==='add_year'){
+  if($operation==='seed_reports'){
+   if(!isset($configured[$key]))fail('Company not found.',404);
+   require_once __DIR__.'/report-demo.php';$targetSettings=$configured[$key];
+   try{
+    $target=new PDO($targetSettings['dsn'],$targetSettings['username'],$targetSettings['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_EMULATE_PREPARES=>false]);
+    $targetAdmin=$target->query("SELECT id FROM users WHERE role='admin' AND active=1 ORDER BY id LIMIT 1")->fetchColumn();
+    if(!$targetAdmin)fail('This company needs an active administrator.',409);
+    seedReportDemoRecords($target,(int)$targetAdmin);
+   }catch(PDOException $e){error_log('CarProject report demo SQL error: '.$e->getCode());fail('Report samples could not be loaded. Check the company installation. The sample transaction was rolled back.',503);}
+   catch(RuntimeException $e){fail($e->getMessage(),409);}
+  }elseif($operation==='add_year'){
    if(!isset($configured[$key]))fail('Company not found.',404);
    $year=filter_var($data['year']??null,FILTER_VALIDATE_INT);$years=companyFinancialYears($configured[$key]);
    if(in_array($year,$years,true))fail('That financial year already exists.',409);
@@ -62,8 +72,9 @@ function saveCompanyConfiguration(array $data,array $actor):void {
   }else fail('Unknown company operation.');
   writePrivateCompanyJson($path,$registry);
   if(isset($jobPath)&&is_file($jobPath))unlink($jobPath);
-  audit($operation==='add_year'?'Added financial year '.$year.'–'.($year+1).': '.$key:($operation==='edit'?'Updated company: '.$key:'Connected company: '.$key),0);
+  audit($operation==='seed_reports'?'Loaded 50 report demo vehicles: '.$key:($operation==='add_year'?'Added financial year '.$year.'–'.($year+1).': '.$key:($operation==='edit'?'Updated company: '.$key:'Connected company: '.$key)),0);
  }finally{flock($lock,LOCK_UN);fclose($lock);}
 }
+
 
 

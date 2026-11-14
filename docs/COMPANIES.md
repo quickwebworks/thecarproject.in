@@ -61,3 +61,12 @@ New company databases now use a short alphanumeric suffix; the API adds the host
 The next year runs from 1 April 2027 to 31 March 2028. Repeat the same process later for 2028–2029. Only the next year can be added; duplicate and skipped years are rejected. Only explicitly added years appear, beginning with 2026–2027.
 
 The company uses its existing database and login accounts. Masters and documents remain shared within the company. Unsold vehicles and their earlier purchase/expense costs remain available. Previous-year sales remain in their original year; transactions are not duplicated. You can switch back to older years. This is not an accounting closing process and does not post tax, cash or bank opening balances. No Hostinger API call, new database, migration or installer run is needed to add a financial year. Company details being edited remain in the editor after adding the year.
+
+
+## Load 50 vehicles for report testing
+
+After deployment, sign in as original-company administrator and open **Companies**. Beside your chosen company, click **Load 50 demo vehicles**, review the company name, and click **Load 50 sample vehicles**. Use a dedicated demo company to keep sample figures separate from real business activity. You may also deliberately add the samples to an existing company: its existing data is preserved and the demo values are added to its reports.
+
+The loader inserts 50 purchases, 35 sales (30 profits and 5 losses), 15 unsold vehicles and 100 unique expense bills in FY 2026–2027. Dates span April to November 2026. Vehicle numbers are PB10TD5001–PB10TD5050; descriptions, counterparties and bills are labelled REPORT DEMO. No customer phone numbers or personal identities are fabricated. A repeated load is rejected. Each batch is one database transaction and rolls back if any insert fails.
+
+Select that company and FY **2026–2027** through **Change company / year**, then open **Overview**, **Vehicle inventory**, **Expenses** and **Profit reports**. With only this 50-vehicle sample batch, realized net profit is **₹7,17,800.00**, completed sales are **35**, and unsold stock is **15**. Existing company activity will increase or change the displayed totals. Adding the next year and switching to it demonstrates unsold-stock carry-forward without duplicating old sales. Loading sample rows into an existing company does not call the Hostinger provisioning API or create another database.
