@@ -23,7 +23,10 @@ class ApiError extends RuntimeException { public function __construct(string $me
 function fail(string $message,int $status=422):never { throw new ApiError($message,$status); }
 function user():array { if(empty($_SESSION['uid']))fail('Please sign in.',401);$u=query('SELECT id,name,username,role,active FROM users WHERE id=?',[$_SESSION['uid']])->fetch();if(!$u||!$u['active'])fail('Account unavailable.',401);return $u; }
 function allow(array $roles):array { $u=user();if(!in_array($u['role'],$roles,true))fail('Your user type does not permit this action.',403);return $u; }
-function txt(array $d,string $k,int $max=160,bool $required=true):string { if(isset($d[$k])&&!is_scalar($d[$k]))fail('Invalid '.$k.'.');$v=trim((string)($d[$k]??''));if(($required&&$v==='')||mb_strlen($v)>$max)fail('Enter a valid '.$k.'.');return $v; }
+function entryText(string $key,string $value):string {
+ return in_array($key,['name','contact','manager_name','manager_contact','salesperson','address','city','details','bill_no'],true)?mb_strtoupper($value,'UTF-8'):$value;
+}
+function txt(array $d,string $k,int $max=160,bool $required=true):string { if(isset($d[$k])&&!is_scalar($d[$k]))fail('Invalid '.$k.'.');$v=entryText($k,trim((string)($d[$k]??'')));if(($required&&$v==='')||mb_strlen($v)>$max)fail('Enter a valid '.$k.'.');return $v; }
 function money(array $d,string $k):string { if(!isset($d[$k])||!is_scalar($d[$k]))fail('Enter '.$k.'.');$v=(string)$d[$k];if(!preg_match('/^\d{1,10}(\.\d{1,2})?$/',$v))fail('Invalid amount: '.$k);return $v; }
 function dateval(array $d,string $key):string { $v=txt($d,$key,10);$date=DateTimeImmutable::createFromFormat('!Y-m-d',$v);if(!$date||$date->format('Y-m-d')!==$v)fail('Enter a valid date.');return $v; }
 function master(array $d,string $key,string $kind,bool $required=true):?int { $id=(int)($d[$key]??0);if(!$id&&!$required)return null;if(!query('SELECT id FROM masters WHERE id=? AND kind=?',[$id,$kind])->fetch())fail('Select a valid '.$kind.'.');return $id; }

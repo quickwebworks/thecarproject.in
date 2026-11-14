@@ -4,3 +4,22 @@
 @media(max-width:680px){.content{padding:22px 16px 100px}.topbar{padding:0 16px}.pagehead{align-items:flex-start;margin-bottom:20px}.pagehead .actions .btn:not(.primary){display:none}h1{font-size:24px}.subtitle{font-size:11px;max-width:245px}.eyebrow{font-size:8px}.btn{padding:10px 12px}.pagehead .btn{font-size:10px}.stats{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}.stat{padding:16px;border-radius:10px}.statvalue{font-size:25px;margin-top:14px}.statlabel{font-size:10px}.statfoot{font-size:9px}.dashboardgrid,.bottomgrid{grid-template-columns:1fr;gap:16px}.dashboardgrid{margin-bottom:16px}.quickgrid{grid-template-columns:repeat(4,1fr);gap:6px;padding:12px}.quick{flex-direction:column;text-align:center;gap:7px;font-size:9px;padding:12px 4px}.quick small{display:none}.notice{margin:0 12px 12px;font-size:9px}.chartwrap{padding:15px}.barchart{height:145px;margin-left:10px;gap:8px}.barcol i{width:13px}.cardhead{padding:16px}.tabletools{padding:12px 16px}.tablefoot{padding:12px 16px}th,td{padding:12px 16px}.legend{font-size:8px;gap:7px}.previewnote{font-size:9px;padding:8px 10px;margin-bottom:17px}.previewnote span{max-width:250px}.topright .dotlabel{display:none}.formgrid{grid-template-columns:1fr;padding:20px;gap:16px}.sectiontitle{padding:20px 20px 0}.formfooter{padding:16px 20px}.formfooter small{max-width:110px}.summarybox{margin:0 20px 20px}.modalback{padding:0;align-items:end}.modal{max-height:94dvh;border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}.modalhead{padding:18px 20px}.modal .formgrid{grid-template-columns:1fr 1fr;gap:12px}.modal .field.full{grid-column:1/-1}.items{padding:0 20px 20px}.itemrow{grid-template-columns:1.4fr .5fr .8fr 26px;gap:5px}.itemrow input{padding:9px 6px;font-size:11px}.login{grid-template-columns:1fr}.loginbrand{padding:28px;min-height:240px}.loginbrand .brand{padding-bottom:28px}.loginbrand h1{font-size:30px;max-width:300px}.loginbrand p{font-size:12px;margin-bottom:0}.loginform{padding:25px}.loginform h2{font-size:23px}.loginform .field{margin-top:17px}.bottomgrid{margin-top:16px}}
 
 svg{width:18px;height:18px;flex-shrink:0}.brandmark svg{width:29px;height:29px}.helpbox>svg{width:19px;height:19px;margin-bottom:7px}.selectsearch{margin-bottom:6px!important;min-height:32px!important;padding:6px 10px!important;font-size:10px!important;background:#fafbfb!important}.modalback~.modalback{z-index:65}
+
+/* Scroll only the navigation; keep account actions in view at every height. */
+.sidebar{height:100vh;height:100dvh;overflow:hidden}
+.sidebar>.brand{flex-shrink:0;padding-bottom:20px}
+.sidebar-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#66818d transparent;padding-right:4px}
+.sidebar-scroll .helpbox{margin:20px 0 8px}
+.sidebarfoot{flex-shrink:0;margin-top:12px;padding:12px 0 0;border-top:1px solid #ffffff18}
+.sidebarfoot .profile{margin:0 4px 12px;min-width:0}
+.sidebarfoot .profile>div{overflow:hidden;overflow-wrap:anywhere}
+.sidebarlogout{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:44px;padding:10px 14px;border:1px solid #ffffff35;border-radius:8px;background:#ffffff0b;color:#fff;font-size:12px;font-weight:650}
+.sidebarlogout:hover{background:#ffffff18}
+.headerlogout{min-height:36px}
+.crumb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#entry-form input[name="name"],#entry-form input[name="manager_name"],#entry-form input[name="salesperson"],#entry-form input[name="bill_no"],#entry-form [data-name],#master-form input[type="text"]{text-transform:uppercase}
+@media(max-width:950px){
+ .sidebarfoot{margin-bottom:0;padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+ .headerlogout{padding:8px;font-size:10px;gap:5px}
+ .topright>.avatar{display:none}
+}
