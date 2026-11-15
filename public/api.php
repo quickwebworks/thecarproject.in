@@ -92,6 +92,9 @@ try {
   if($action==='user'){
    require_once dirname(__DIR__).'/app/company-users.php';createCompanyUser($d);out(['ok'=>true]);
   }
+  if($action==='reset_user_password'){
+   require_once dirname(__DIR__).'/app/company-users.php';resetCompanyUserPassword($d);out(['ok'=>true]);
+  }
   if($action==='toggle_user'){
    allow(['admin']);$id=(int)($d['id']??0);if($id===$u['id'])fail('You cannot disable your own account.');transaction(function()use($id){$target=query('SELECT id FROM users WHERE id=? FOR UPDATE',[$id])->fetch();if(!$target)fail('User not found.');query('UPDATE users SET active=1-active WHERE id=?',[$id]);audit('Changed user status',$id);});out(['ok'=>true]);
   }
@@ -132,6 +135,7 @@ try {
  }
  fail('Not found.',404);
 }catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}
+
 
 
 
