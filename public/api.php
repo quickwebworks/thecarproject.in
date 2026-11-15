@@ -90,8 +90,7 @@ try {
    });out(['ok'=>true]);
   }
   if($action==='user'){
-   allow(['admin']);$role=txt($d,'role',20);if(!in_array($role,['admin','manager','accountant','viewer'],true))fail('Invalid user type.');$pw=(string)($d['password']??'');if(strlen($pw)<12||strlen($pw)>128)fail('Use a password between 12 and 128 characters.');$username=txt($d,'username',80);if(!preg_match('/^[a-zA-Z0-9_.-]{3,80}$/',$username))fail('Invalid username.');
-   transaction(function()use($d,$pw,$role,$username){query('INSERT INTO users(name,username,password_hash,role) VALUES(?,?,?,?)',[txt($d,'name',120),$username,password_hash($pw,PASSWORD_DEFAULT),$role]);audit('Created user',(int)db()->lastInsertId());});out(['ok'=>true]);
+   require_once dirname(__DIR__).'/app/company-users.php';createCompanyUser($d);out(['ok'=>true]);
   }
   if($action==='toggle_user'){
    allow(['admin']);$id=(int)($d['id']??0);if($id===$u['id'])fail('You cannot disable your own account.');transaction(function()use($id){$target=query('SELECT id FROM users WHERE id=? FOR UPDATE',[$id])->fetch();if(!$target)fail('User not found.');query('UPDATE users SET active=1-active WHERE id=?',[$id]);audit('Changed user status',$id);});out(['ok'=>true]);
@@ -133,6 +132,7 @@ try {
  }
  fail('Not found.',404);
 }catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}
+
 
 
 
