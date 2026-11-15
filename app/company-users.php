@@ -33,3 +33,21 @@ function createCompanyUser(array $data):void {
   throw $e;
  }
 }
+
+
+function resetCompanyUserPassword(array $data):void {
+ allow(['admin']);
+ $id=filter_var($data['id']??null,FILTER_VALIDATE_INT);
+ if(!$id||$id<1)fail('Select a valid user.');
+ $password=$data['password']??null;$confirm=$data['confirm_password']??null;
+ if(!is_string($password)||strlen($password)<12||strlen($password)>72)fail('Use a password between 12 and 72 bytes.');
+ if(!is_string($confirm)||!hash_equals($password,$confirm))fail('Passwords do not match.');
+ // Resolve IDs only inside the currently selected company's connection.
+ transaction(function()use($id,$password){
+  $target=query('SELECT id,username FROM users WHERE id=?',[$id])->fetch();
+  if(!$target)fail('User not found in this company.',404);
+  query('UPDATE users SET password_hash=? WHERE id=?',[password_hash($password,PASSWORD_DEFAULT),$id]);
+  query('DELETE FROM login_attempts WHERE identifier=?',[hash('sha256',strtolower($target['username']))]);
+  audit('Reset user password',$id);
+ });
+}
