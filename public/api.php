@@ -24,6 +24,14 @@ try {
    session_regenerate_id(true);$_SESSION['uid']=$u['id'];$_SESSION['auth_company']=$_SESSION['company_key'];$_SESSION['csrf']=bin2hex(random_bytes(32));audit('Signed in',(int)$u['id']);out(workspaceSessionPayload());
   }
   $u=user();
+  if($action==='release_expected'){
+   allow(['admin','manager','accountant']);require_once dirname(__DIR__).'/app/document-expectations.php';ensureDocumentExpectations();
+   $vehicle=master($d,'vehicle_id','vehicle');$value=$d['expected']??null;
+   if(!in_array($value,['','0','1',0,1],true))fail('Select Yes or No.');
+   $purchase=query('SELECT id,purchase_date FROM purchases WHERE vehicle_id=?',[$vehicle])->fetch();
+   if(!$purchase||$purchase['purchase_date']>workspaceInfo()['financial_year']['end'])fail('Purchase not found in this financial year.',404);
+   transaction(function()use($vehicle,$value,$purchase){query('UPDATE purchases SET release_letter_expected=? WHERE vehicle_id=?',[$value===''?null:(int)$value,$vehicle]);audit('Updated release letter expectation',(int)$purchase['id']);});out(['ok'=>true]);
+  }
   if(in_array($action,['purchase','sale','yard_expense','yard_delete'],true)){require_once dirname(__DIR__).'/app/yard-expenses.php';ensureYardExpenses();}
   if($action==='logout'){$_SESSION=[];session_destroy();out(['ok'=>true]);}
   if($action==='master'){
@@ -108,6 +116,7 @@ try {
   header('Content-Type: '.$f['mime']);header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($f['original_name']));header('Content-Length: '.filesize($path));readfile($path);exit;
  }
  if($action==='state'){
+  require_once dirname(__DIR__).'/app/document-expectations.php';ensureDocumentExpectations();
   require_once dirname(__DIR__).'/app/yard-expenses.php';ensureYardExpenses();
   $range=workspaceInfo()['financial_year'];$end=$range['end'];$state=[];
   $state['masters']=query('SELECT * FROM masters ORDER BY id DESC')->fetchAll();
@@ -124,6 +133,7 @@ try {
  }
  fail('Not found.',404);
 }catch(ApiError $e){out(['error'=>$e->getMessage()],$e->status);}catch(PDOException $e){error_log('CarProject database error: '.$e->getCode());out(['error'=>$e->getCode()==='23000'?'This record already exists or conflicts with a linked record.':'Database operation failed. Check the selected company database setup.'],409);}catch(JsonException $e){out(['error'=>'Invalid JSON.'],422);}catch(Throwable $e){error_log('CarProject error: '.$e->getMessage());out(['error'=>'Unable to complete request. Check server logs.'],500);}
+
 
 
 
